@@ -33,15 +33,6 @@ abstract class Entity {
 
   @override
   String toString() => qid;
-
-  static Map<String, String> _multiLanguageStringsFromJson(Map<String, dynamic> json) =>
-      json.map((key, value) => MapEntry<String, String>(key, value["value"]));
-
-  static Map<String, List<String>> _aliasesFromJson(Map<String, dynamic> aliasesJson) =>
-      aliasesJson.map((language, aliasList) => MapEntry<String, List<String>>(language, (aliasList as List<dynamic>).map((alias) => alias["value"])));
-
-  static Map<String, List<Claim>> _claimsFromJson(Map<String, dynamic> claimsJson) =>
-      claimsJson.map((property, claims) => MapEntry<String, List<Claim>>(property, (claims as List<dynamic>).map((json) => Claim.fromParsedJson(json))));
 }
 
 class Item extends Entity {
@@ -57,16 +48,14 @@ class Item extends Entity {
       : super(qid, modified, lastRevId, labels, descriptions, aliases, claims);
 
   factory Item.fromParsedJson(Map<String, dynamic> json) {
-    assert(json is Map);
-    var jsonMap = json as Map<String, dynamic>;
-    var aliasesJson = jsonMap["aliases"] as Map<String, dynamic>;
-
     return Item(
-        qid: json["id"],
-        labels: Entity._multiLanguageStringsFromJson(jsonMap["labels"]),
-        descriptions: Entity._multiLanguageStringsFromJson(jsonMap["descriptions"]),
-        aliases: Entity._aliasesFromJson(aliasesJson),
-        claims: Entity._claimsFromJson(jsonMap["claims"]));
+      qid: json["id"],
+      labels: _multiLanguageStringsFromJson(json["labels"]),
+      descriptions: _multiLanguageStringsFromJson(json["descriptions"]),
+      aliases: _aliasesFromJson(json["aliases"]),
+      claims: _claimsFromJson(json["claims"]),
+      siteLinks: _siteLinksFromJson(json["sitelinks"]),
+    );
   }
 
   get type => EntityType.item;
@@ -86,8 +75,6 @@ class Property extends Entity {
       : super(qid, modified, lastRevId, labels, descriptions, aliases, claims);
 
   factory Property.fromParsedJson(Map<String, dynamic> json) {
-    assert(json is Map);
-
     throw UnimplementedError();
   }
 
@@ -100,10 +87,9 @@ class Claim {
   factory Claim.fromParsedJson(Map<String, dynamic> json) => Claim(
       id: json["id"],
       rank: _rankFromJson(json["rank"]),
-      mainSnak: Snak.fromParsedJson(json["mainSnak"]),
-      qualifiers: _qualifiersFromJson(json["qualifiers"]),
-      references: _referencesFromJson(json["references"])
-    );
+      mainSnak: Snak.fromParsedJson(json["mainsnak"]),
+      qualifiers: _snaksTableFromJson(json["qualifiers"], json["qualifiers-order"]),
+      references: _referencesFromJson(json["references"]));
 
   String id;
 
@@ -114,30 +100,13 @@ class Claim {
 
   @override
   String toString() => mainSnak.toString();
-
-  static ClaimRank _rankFromJson(String rank) {
-    switch(rank) {
-      case "normal":
-        return ClaimRank.normal;
-      case "deprecated":
-        return ClaimRank.deprecated;
-      case "preferred":
-        return ClaimRank.preferred;
-      default:
-        throw FormatException("Invalid or unsupported rank");
-    }
-  }
-
-  static LinkedHashMap<String, List<Snak>> _qualifiersFromJson(Map<String, dynamic> json) {
-    throw UnimplementedError();
-  }
-
-  static List<Reference> _referencesFromJson(List<dynamic> json) {
-    throw UnimplementedError();
-  }
 }
 
 class Reference {
+  Reference({this.hash, this.snaks});
+
+  factory Reference.fromParsedJson(Map<String, dynamic> json) => Reference(hash: json["hash"], snaks: _snaksTableFromJson(json["snaks"], json["snaks-order"]));
+
   String hash;
 
   LinkedHashMap<String, List<Snak>> snaks;
@@ -147,6 +116,16 @@ abstract class Snak {
   Snak({this.hash});
 
   factory Snak.fromParsedJson(Map<String, dynamic> json) {
+    switch (json["snaktype"]) {
+      case "value":
+        return ValueSnak.fromParsedJson(json);
+      case "novalue":
+        return NoValueSnak.fromParsedJson(json);
+      case "somevalue":
+        return SomeValueSnak.fromParsedJson(json);
+      default:
+        throw FormatException("Invalid or unsupported snak type");
+    }
   }
 
   String hash;
@@ -156,6 +135,10 @@ abstract class Snak {
 
 class ValueSnak extends Snak {
   ValueSnak({@required String hash, @required this.dataType, @required this.value}) : super(hash: hash);
+
+  factory ValueSnak.fromParsedJson(Map<String, dynamic> json) {
+    return ValueSnak(hash: json["hash"], dataType: json["datatype"], value: DataValue.fromParsedJson(json["datavalue"]));
+  }
 
   get type => SnakType.value;
 
@@ -169,6 +152,8 @@ class ValueSnak extends Snak {
 class SomeValueSnak extends Snak {
   SomeValueSnak({@required String hash}) : super(hash: hash);
 
+  factory SomeValueSnak.fromParsedJson(Map<String, dynamic> json) => SomeValueSnak(hash: json["hash"]);
+
   get type => SnakType.someValue;
 
   @override
@@ -177,6 +162,8 @@ class SomeValueSnak extends Snak {
 
 class NoValueSnak extends Snak {
   NoValueSnak({@required String hash}) : super(hash: hash);
+
+  factory NoValueSnak.fromParsedJson(Map<String, dynamic> json) => NoValueSnak(hash: json["hash"]);
 
   get type => SnakType.noValue;
 
@@ -196,10 +183,41 @@ class SiteLink {
 
 abstract class DataValue {
   ValueType get type;
+
+  DataValue();
+
+  factory DataValue.fromParsedJson(Map<String, dynamic> json) {
+    switch (_valueTypeFromJson(json["type"])) {
+      case ValueType.string:
+        return StringValue.fromJson(json);
+      case ValueType.entityId:
+        return EntityIdValue.fromJson(json);
+      case ValueType.monolingualText:
+        return MonolingualText.fromJson(json);
+/*
+      case ValueType.quantity:
+        return QuantityValue.fromJson(json);
+      case ValueType.time:
+        return TimeValue.fromJson(json);
+      case ValueType.coordinate:
+        return CoordinateValue.fromJson(json);
+*/
+      default:
+        return StringValue("unimplemented ${json["type"]}");
+        throw UnimplementedError();
+    }
+  }
+
+  @override
+  String toString() => "Unimplemented toString() on $type";
 }
 
 class StringValue extends DataValue {
   StringValue(this.value);
+
+  factory StringValue.fromJson(Map<String, dynamic> json) {
+    return StringValue(json["value"]);
+  }
 
   get type => ValueType.string;
 
@@ -212,6 +230,11 @@ class StringValue extends DataValue {
 class EntityIdValue extends DataValue {
   EntityIdValue(this.qid);
 
+  factory EntityIdValue.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> value = json["value"];
+    return EntityIdValue(value["id"]);
+  }
+
   get type => ValueType.entityId;
 
   String qid;
@@ -223,6 +246,11 @@ class EntityIdValue extends DataValue {
 class MonolingualText extends DataValue {
   MonolingualText({@required this.text, @required this.language});
 
+  factory MonolingualText.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> value = json["value"];
+    return MonolingualText(text: value["text"], language: value["language"]);
+  }
+
   get type => ValueType.monolingualText;
 
   String text;
@@ -231,3 +259,56 @@ class MonolingualText extends DataValue {
   @override
   String toString() => '"$text"@$language';
 }
+
+Map<String, String> _multiLanguageStringsFromJson(Map<String, dynamic> json) => json.map((key, value) => MapEntry<String, String>(key, value["value"]));
+
+Map<String, List<String>> _aliasesFromJson(Map<String, dynamic> aliasesJson) => aliasesJson
+    .map((language, aliasList) => MapEntry<String, List<String>>(language, (aliasList as List<dynamic>).map((alias) => alias["value"] as String).toList()));
+
+Map<String, List<Claim>> _claimsFromJson(Map<String, dynamic> claimsJson) =>
+    claimsJson.map((property, claims) => MapEntry<String, List<Claim>>(property, (claims as List<dynamic>).map((json) => Claim.fromParsedJson(json)).toList()));
+
+Map<String, SiteLink> _siteLinksFromJson(Map<String, dynamic> siteLinksJson) =>
+    siteLinksJson.map((site, link) => MapEntry<String, SiteLink>(site, SiteLink(pageTitle: link["title"], badges: _stringListFromJson(link["badges"]))));
+
+ClaimRank _rankFromJson(String rank) {
+  switch (rank) {
+    case "normal":
+      return ClaimRank.normal;
+    case "deprecated":
+      return ClaimRank.deprecated;
+    case "preferred":
+      return ClaimRank.preferred;
+    default:
+      throw FormatException("Invalid or unsupported rank");
+  }
+}
+
+ValueType _valueTypeFromJson(String type) {
+  switch (type) {
+    case "string":
+      return ValueType.string;
+    case "wikibase-entityid":
+      return ValueType.entityId;
+    case "globecoordinate":
+      return ValueType.coordinate;
+    case "quantity":
+      return ValueType.quantity;
+    case "time":
+      return ValueType.time;
+    case "monolingualtext":
+      return ValueType.monolingualText;
+    default:
+      throw new FormatException("Invalid or unsupported value type");
+  }
+}
+
+LinkedHashMap<String, List<Snak>> _snaksTableFromJson(Map<String, dynamic> snaksJson, List<dynamic> snaksOrder) => snaksJson == null || snaksOrder == null
+    ? LinkedHashMap()
+    : LinkedHashMap.fromEntries(snaksOrder.map((property) => MapEntry(property, _snakListFromJson(snaksJson[property]))));
+
+List<Snak> _snakListFromJson(List<dynamic> json) => json.map((snak) => Snak.fromParsedJson(snak)).toList();
+
+List<Reference> _referencesFromJson(List<dynamic> json) => json == null ? [] : json.map((reference) => Reference.fromParsedJson(reference)).toList();
+
+List<String> _stringListFromJson(List<dynamic> json) => json.map((item) => (item as String)).toList();

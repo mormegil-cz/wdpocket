@@ -13,9 +13,9 @@ void main() {
       claims: {
         "P31": <Claim>[
           Claim(
-              id: "Q42\$F078E5B3-F9A8-480E-B7AC-D97778CBBEF9",
+              id: r"Q42$F078E5B3-F9A8-480E-B7AC-D97778CBBEF9",
               rank: ClaimRank.normal,
-              mainSnak: ValueSnak(dataType: "wikibase-item", value: EntityIdValue("Q5")),
+              mainSnak: ValueSnak(dataType: "wikibase-item", value: EntityIdValue("Q5"), hash: "ad7d38a03cdd40cdc373de0dc4e7b7fcbccb31d9"),
               qualifiers: LinkedHashMap.from({}),
               references: [])
         ]
