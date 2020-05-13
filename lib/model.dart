@@ -194,22 +194,16 @@ abstract class DataValue {
         return EntityIdValue.fromJson(json);
       case ValueType.monolingualText:
         return MonolingualText.fromJson(json);
-/*
       case ValueType.quantity:
         return QuantityValue.fromJson(json);
       case ValueType.time:
         return TimeValue.fromJson(json);
       case ValueType.coordinate:
         return CoordinateValue.fromJson(json);
-*/
       default:
-        return StringValue("unimplemented ${json["type"]}");
         throw UnimplementedError();
     }
   }
-
-  @override
-  String toString() => "Unimplemented toString() on $type";
 }
 
 class StringValue extends DataValue {
@@ -258,6 +252,62 @@ class MonolingualText extends DataValue {
 
   @override
   String toString() => '"$text"@$language';
+}
+
+class TimeValue extends DataValue {
+  TimeValue({@required this.time, @required this.precision, @required this.calendarModel});
+
+  factory TimeValue.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> value = json["value"];
+    return TimeValue(time: DateTime.parse(value["time"]), precision: value["precision"], calendarModel: value["calendarmodel"]);
+  }
+
+  get type => ValueType.time;
+
+  DateTime time;
+  int precision;
+  String calendarModel;
+
+  @override
+  String toString() => "${time.toIso8601String()}/$precision";
+}
+
+class QuantityValue extends DataValue {
+  QuantityValue({@required this.amount, @required this.upperBound, @required this.lowerBound, @required this.unit});
+
+  factory QuantityValue.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> value = json["value"];
+    return QuantityValue(amount: value["amount"], upperBound: value["upperBound"], lowerBound: value["lowerBound"], unit: value["unit"]);
+  }
+
+  get type => ValueType.quantity;
+
+  String amount;
+  String upperBound;
+  String lowerBound;
+  String unit;
+
+  @override
+  String toString() => lowerBound == null ? "$amount $unit" : "$amount <$lowerBound; $upperBound> $unit";
+}
+
+class CoordinateValue extends DataValue {
+  CoordinateValue({@required this.latitude, @required this.longitude, @required this.precision, @required this.globe});
+
+  factory CoordinateValue.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> value = json["value"];
+    return CoordinateValue(latitude: value["latitude"].toString(), longitude: value["longitude"].toString(), precision: value["precision"], globe: value["globe"]);
+  }
+
+  get type => ValueType.coordinate;
+
+  String latitude;
+  String longitude;
+  int precision;
+  String globe;
+
+  @override
+  String toString() => "$latitude, $longitude /$precision";
 }
 
 Map<String, String> _multiLanguageStringsFromJson(Map<String, dynamic> json) => json.map((key, value) => MapEntry<String, String>(key, value["value"]));
