@@ -1,16 +1,39 @@
 import 'dart:collection';
-
 import 'package:flutter/material.dart';
 
 import 'model.dart';
+import 'adams.dart';
 
 void main() {
-  runApp(MyApp());
+  var adamsSample = Item(
+      qid: "Q42",
+      labels: {"en": "Douglas Adams"},
+      descriptions: {"en": "English writer"},
+      aliases: {},
+      claims: {
+        "P31": <Claim>[
+          Claim(
+              id: "Q42\$F078E5B3-F9A8-480E-B7AC-D97778CBBEF9",
+              rank: ClaimRank.normal,
+              mainSnak: ValueSnak(dataType: "wikibase-item", value: EntityIdValue("Q5")),
+              qualifiers: LinkedHashMap.from({}),
+              references: [])
+        ]
+      },
+      siteLinks: {"enwiki": SiteLink(pageTitle: "Douglas Adams")},
+      lastRevId: "0",
+      modified: DateTime(2020, 05, 13, 10, 22, 31));
+
+  var adams = Entity.fromParsedJson(q42ParsedJson);
+
+  runApp(MyApp(entity:adams));
 }
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+  MyApp({@required this.entity});
+
   final String title = "WD Pocket";
+  final Entity entity;
 
   @override
   Widget build(BuildContext context) {
@@ -39,30 +62,13 @@ class MyApp extends StatelessWidget {
             title: Text(this.title),
           ),
           body: EntityView(
-              entity: Item(
-                  qid: "Q42",
-                  labels: {"en": "Douglas Adams"},
-                  descriptions: {"en": "English writer"},
-                  aliases: {},
-                  claims: {
-                    "P31": <Claim>[
-                      Claim(
-                          id: "Q42\$F078E5B3-F9A8-480E-B7AC-D97778CBBEF9",
-                          rank: ClaimRank.normal,
-                          mainSnak: ValueSnak(dataType: "wikibase-item", value: EntityIdValue("Q5")),
-                          qualifiers: LinkedHashMap.from({}),
-                          references: [])
-                    ]
-                  },
-                  siteLinks: {"enwiki": SiteLink(pageTitle: "Douglas Adams")},
-                  lastRevId: "0",
-                  modified: DateTime(2020, 05, 13, 10, 22, 31))),
+              entity: this.entity),
         ));
   }
 }
 
 class EntityView extends StatelessWidget {
-  EntityView({GlobalKey key, this.entity})
+  EntityView({@required this.entity, Key key})
       : orderedClaims = entity.claims.entries.toList(),
         super(key: key);
 
@@ -73,10 +79,11 @@ class EntityView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
         itemCount: entity.claims.length,
-        itemBuilder: (context, index) => Container(
-            decoration: BoxDecoration(border: Border(top: BorderSide())),
-            padding: EdgeInsets.symmetric(vertical: 5),
-            child: _buildClaimWidget(context, orderedClaims[index].key, orderedClaims[index].value)));
+        itemBuilder: (context, index) =>
+            Container(
+                decoration: BoxDecoration(border: Border(top: BorderSide())),
+                padding: EdgeInsets.symmetric(vertical: 5),
+                child: _buildClaimWidget(context, orderedClaims[index].key, orderedClaims[index].value)));
   }
 
   Widget _buildClaimWidget(BuildContext context, String propertyId, List<Claim> claims) {
