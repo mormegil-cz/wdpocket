@@ -265,7 +265,7 @@ class TimeValue extends DataValue {
   get type => ValueType.time;
 
   DateTime time;
-  int precision;
+  num precision;
   String calendarModel;
 
   @override
@@ -303,7 +303,7 @@ class CoordinateValue extends DataValue {
 
   String latitude;
   String longitude;
-  int precision;
+  num precision;
   String globe;
 
   @override

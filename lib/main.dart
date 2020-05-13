@@ -1,10 +1,11 @@
 import 'dart:collection';
 import 'package:flutter/material.dart';
+import 'package:pocket_data/api.dart';
 
 import 'model.dart';
 import 'adams.dart';
 
-void main() {
+void main() async {
   var adamsSample = Item(
       qid: "Q42",
       labels: {"en": "Douglas Adams"},
@@ -24,9 +25,12 @@ void main() {
       lastRevId: "0",
       modified: DateTime(2020, 05, 13, 10, 22, 31));
 
-  var adams = Entity.fromParsedJson(q42ParsedJson);
+  //var adams = Entity.fromParsedJson(q42ParsedJson);
 
-  runApp(MyApp(entity:adams));
+  var entitySource = WikibaseApi();
+  var entity = await entitySource.getEntity("Q256");
+
+  runApp(MyApp(entity:entity));
 }
 
 class MyApp extends StatelessWidget {
