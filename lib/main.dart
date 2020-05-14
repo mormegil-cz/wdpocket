@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:pocket_data/api.dart';
 
@@ -11,54 +10,61 @@ void main() async {
   runApp(WdPocketApp());
 }
 
-class WdPocketApp extends StatefulWidget {
-  @override
-  State<StatefulWidget> createState() => WdPocketAppState();
-}
-
-class WdPocketAppState extends State<WdPocketApp> {
-  String _qid;
-  Entity _entity;
-
-  @override
-  void initState() {
-    super.initState();
-    requestLoadEntity("Q42");
-  }
-
-  void requestLoadEntity(String qid) {
-    entitySource.getEntity(qid).then((loadedEntity) => this.setState(() {
-      _qid = qid;
-      _entity = loadedEntity;
-    }));
-  }
-
+class WdPocketApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
-      title: this._qid ?? "",
+      title: "WD Pocket",
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
         // This makes the visual density adapt to the platform that you run
         // the app on. For desktop platforms, the controls will be smaller and
         // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: Scaffold(
+      home: WdPocketAppHome());
+}
+
+class WdPocketAppHome extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => WdPocketAppHomeState();
+}
+
+class WdPocketAppHomeState extends State<WdPocketAppHome> {
+  String _qid;
+  Future<Entity> _entity;
+
+  @override
+  void initState() {
+    super.initState();
+    print("initState()");
+    requestLoadEntity("Q42");
+  }
+
+  void requestLoadEntity(String qid) {
+    setState(() {
+      print("Requesting load of $qid");
+      _qid = qid;
+      _entity = entitySource.getEntity(qid);
+    });
+  }
+
+  void _showQidDialog() async {
+    print("Show QID dialog");
+    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", requestLoadEntity));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
         appBar: AppBar(
-          title: Text(this._qid ?? ""),
-          actions: <Widget>[IconButton(icon: Icon(Icons.search))],
+          title: Text(_qid ?? "WD Pocket"),
+          actions: <Widget>[IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog)],
         ),
-        body: _entity == null ? Container() : EntityView(entity: _entity),
-      ));
+        body: FutureBuilder<Entity>(
+            future: _entity,
+            builder: (context, snapshot) =>
+                snapshot.hasData ? EntityView(entity: snapshot.data) : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
+  }
 }
 
 class EntityView extends StatelessWidget {
@@ -163,4 +169,28 @@ class EntitySiteLinksView extends StatelessWidget {
   Widget build(BuildContext context) => ListView.builder(
       itemBuilder: (content, index) => ListTile(leading: Text(orderedLinks[index].key), title: Text(orderedLinks[index].value.pageTitle)),
       itemCount: orderedLinks.length);
+}
+
+WidgetBuilder _createTextInputDialogBuilder(String caption, String hintText, void onDataEntered(String data)) {
+  return (BuildContext context) {
+    final TextEditingController controller = TextEditingController();
+
+    void onDone() {
+      Navigator.of(context).pop();
+      onDataEntered(controller.text);
+    }
+
+    return AlertDialog(
+      title: Text(caption),
+      content: TextField(controller: controller, decoration: InputDecoration(hintText: hintText), autofocus: true, onSubmitted: (text) => onDone()),
+      actions: <Widget>[
+        new FlatButton(onPressed: onDone, child: Text("OK")),
+        new FlatButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text("Cancel"))
+      ],
+    );
+  };
 }

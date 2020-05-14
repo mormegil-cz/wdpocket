@@ -14,6 +14,7 @@ class WikibaseApi implements EntitySource {
     request.headers.add("From", "petr.kadlec@gmail.com");
     final response = await request.close();
     final json = await utf8.decoder.bind(response).join();
+    print("Retrieved entity JSON for $qid");
     final decodedJson = jsonDecode(json);
     return Entity.fromParsedJson(decodedJson["entities"][qid]);
   }
