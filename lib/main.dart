@@ -49,7 +49,6 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
   }
 
   void _showQidDialog() async {
-    print("Show QID dialog");
     await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", requestLoadEntity));
   }
 
@@ -74,28 +73,33 @@ class EntityView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-        length: entity.type == EntityType.item ? 4 : 3,
-        child: Scaffold(
-          appBar: AppBar(
-            bottom: TabBar(
-              tabs: [
-                Tab(icon: Icon(Icons.label_outline)),
-                Tab(icon: Icon(Icons.library_books)),
-                Tab(icon: Icon(Icons.perm_identity)),
-                if (entity.type == EntityType.item) Tab(icon: Icon(Icons.link))
+      length: entity.type == EntityType.item ? 4 : 3,
+      child: Column(
+        children: <Widget>[
+          Container(
+              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
+              child: TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.label_outline)),
+                  Tab(icon: Icon(Icons.library_books)),
+                  if (entity.type == EntityType.item) Tab(icon: Icon(Icons.perm_identity)),
+                  if (entity.type == EntityType.property) Tab(icon: Icon(Icons.flag)),
+                  if (entity.type == EntityType.item) Tab(icon: Icon(Icons.link)),
+                ],
+              )),
+          Expanded(
+            child: TabBarView(
+              children: [
+                EntityLabellingView(entity: entity),
+                EntityClaimView(orderedClaims: _getClaims((dataType) => dataType != "external-id")),
+                if (entity.type == EntityType.item) EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "external-id")),
+                if (entity.type == EntityType.property) EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "!!TODO: property constraints")),
+                if (entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: (entity as Item).siteLinks.entries.toList())
               ],
             ),
-          ),
-          body: TabBarView(
-            children: [
-              EntityLabellingView(entity: entity),
-              EntityClaimView(orderedClaims: _getClaims((dataType) => dataType != "external-id")),
-              EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "external-id")),
-              if (entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: (entity as Item).siteLinks.entries.toList())
-            ],
-          ),
-        ),
-      );
+          )
+        ],
+      ));
 
   List<MapEntry<String, List<Claim>>> _getClaims(bool dataTypeFilter(String dataType)) {
     // TODO: This filters on actual values, it should rather filter on property definitions, since properties with no value snaks appear everywhere right now

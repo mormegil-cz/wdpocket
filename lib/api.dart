@@ -16,6 +16,11 @@ class WikibaseApi implements EntitySource {
     final json = await utf8.decoder.bind(response).join();
     print("Retrieved entity JSON for $qid");
     final decodedJson = jsonDecode(json);
-    return Entity.fromParsedJson(decodedJson["entities"][qid]);
+    try {
+      return Entity.fromParsedJson(decodedJson["entities"][qid]);
+    } catch (e) {
+      print(e);
+      throw e;
+    }
   }
 }

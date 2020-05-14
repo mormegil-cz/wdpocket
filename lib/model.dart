@@ -75,7 +75,13 @@ class Property extends Entity {
       : super(qid, modified, lastRevId, labels, descriptions, aliases, claims);
 
   factory Property.fromParsedJson(Map<String, dynamic> json) {
-    throw UnimplementedError();
+    return Property(
+      qid: json["id"],
+      labels: _multiLanguageStringsFromJson(json["labels"]),
+      descriptions: _multiLanguageStringsFromJson(json["descriptions"]),
+      aliases: _aliasesFromJson(json["aliases"]),
+      claims: _claimsFromJson(json["claims"]),
+    );
   }
 
   get type => EntityType.property;
