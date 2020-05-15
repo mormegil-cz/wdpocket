@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pocket_data/api.dart';
 
 import 'model.dart';
-// import 'adams.dart';
 
-final entitySource = WikibaseApi();
+// TODO: Language localization/configuration
+final entitySource = WikibaseApi(languages: ["cs", "sk", "en"]);
 
 void main() async {
   runApp(WdPocketApp());
@@ -37,19 +37,19 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
   void initState() {
     super.initState();
     print("initState()");
-    requestLoadEntity("Q42");
+    requestLoadEntity("Q42", false);
   }
 
-  void requestLoadEntity(String qid) {
+  void requestLoadEntity(String qid, bool forceReload) {
     setState(() {
       print("Requesting load of $qid");
       _qid = qid;
-      _entity = entitySource.getEntity(qid);
+      _entity = entitySource.getEntity(qid, forceReload);
     });
   }
 
   void _showQidDialog() async {
-    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", requestLoadEntity));
+    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", (qid) => requestLoadEntity(qid, false)));
   }
 
   @override
@@ -62,7 +62,7 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
         body: FutureBuilder<Entity>(
             future: _entity,
             builder: (context, snapshot) =>
-                snapshot.hasData ? EntityView(entity: snapshot.data) : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
+                snapshot.hasData ? EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data) : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
   }
 }
 
@@ -158,7 +158,7 @@ class EntityClaimView extends StatelessWidget {
     final List<Widget> claimWidgets = claims.map((claim) => ListTile(key: ValueKey(claim.id), title: Text(claim.toString()))).toList(growable: false);
 
     return Column(children: <Widget>[
-      Text(propertyId, style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
+      Text(entitySource.getPropertyLabel(propertyId), style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
       Container(padding: EdgeInsets.only(left: 5), child: Column(children: claimWidgets))
     ]);
   }
