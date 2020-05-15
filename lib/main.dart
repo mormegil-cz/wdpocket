@@ -61,8 +61,9 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
         ),
         body: FutureBuilder<Entity>(
             future: _entity,
-            builder: (context, snapshot) =>
-                snapshot.hasData ? EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data) : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
+            builder: (context, snapshot) => snapshot.hasData
+                ? EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data)
+                : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
   }
 }
 
