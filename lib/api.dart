@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:meta/meta.dart';
+import 'package:package_info/package_info.dart';
 
-import 'util.dart';
 import 'model.dart';
+import 'util.dart';
 
 abstract class EntitySource {
   Future<Entity> getEntity(String qid, bool forceReload);
@@ -12,26 +13,32 @@ abstract class EntitySource {
 
 class WikibaseApi implements EntitySource {
   // TODO: Fix for public release
-  static const String responsiveUser = "petr.kadlec@gmail.com";
-  static final userAgentString =
-      "WD Pocket/0.1 (${Platform.operatingSystem}/${Platform.operatingSystemVersion}) Dart/${Platform.version} (run by <$responsiveUser>)";
+  static const String _responsibleUser = "petr.kadlec@gmail.com";
+  static Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+  static final String _platformInfoString =
+      "(${Platform.operatingSystem}/${Platform.operatingSystemVersion}) Dart/${Platform.version} (run by <$_responsibleUser>)";
 
   final Map<String, String> _propertyLabels = {};
   final List<String> languages;
 
   WikibaseApi({@required this.languages});
 
+  Future<String> _getUserAgentString() async {
+    final info = await _packageInfo;
+    return "${info.appName}/${info.version} $_platformInfoString";
+  }
+
   Future<String> _apiGet(String uri) async {
     final request = await HttpClient().getUrl(Uri.parse(uri));
-    request.headers.add("User-Agent", userAgentString);
-    request.headers.add("From", responsiveUser);
+    request.headers.add("User-Agent", await _getUserAgentString());
+    request.headers.add("From", _responsibleUser);
     final response = await request.close();
 
     return await utf8.decoder.bind(response).join();
   }
 
   String _getLocalizedLabel(String id, Map<String, String> labels) {
-    for(final language in languages) {
+    for (final language in languages) {
       final localized = labels[language];
       if (localized != null && localized.isNotEmpty) {
         return localized;
