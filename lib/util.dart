@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 T identity<T>(T x) => x;
 
 Iterable<T> flatten<T>(Iterable<Iterable<T>> collection) => flatMap(collection, identity);
@@ -19,3 +17,6 @@ Iterable<List<T>> split<T>(Iterable<T> collection, int maxSize) sync* {
     yield currBatch;
   }
 }
+
+String getLocalizedLabel(Map<String, String> localizations, Iterable<String> languages) =>
+    languages.map((language) => localizations[language]).firstWhere((element) => element != null && element.isNotEmpty, orElse: null);

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_data/api.dart';
+import 'package:pocket_data/models/entity_with_labels.dart';
 
-import 'model.dart';
+import 'datasources/api.dart';
+import 'datasources/cached_api.dart';
+import 'models/model.dart';
 
 // TODO: Language localization/configuration
-final entitySource = WikibaseApi(languages: ["cs", "sk", "en"]);
+final EntitySource entitySource = CachedWikibaseApi(languages: ["cs", "sk", "en"]);
 
 void main() async {
   runApp(WdPocketApp());
@@ -31,7 +33,7 @@ class WdPocketAppHome extends StatefulWidget {
 
 class WdPocketAppHomeState extends State<WdPocketAppHome> {
   String _qid;
-  Future<Entity> _entity;
+  Future<EntityWithLabels> _entity;
 
   @override
   void initState() {
@@ -44,8 +46,14 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
     setState(() {
       print("Requesting load of $qid");
       _qid = qid;
-      _entity = Future.delayed(Duration(seconds: 1)).then((value) => entitySource.getEntity(qid, forceReload));
+      _entity = _loadEntityWithLabels(qid, forceReload);
     });
+  }
+
+  Future<EntityWithLabels> _loadEntityWithLabels(String qid, bool forceReload) async {
+    final entity = await entitySource.getEntity(qid, forceReload);
+    final labels = await entitySource.getEntityLabels(entity.collectAllPropertiesUsed());
+    return EntityWithLabels(entity, labels);
   }
 
   void _showQidDialog() async {
@@ -59,15 +67,15 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
           title: Text(_qid ?? "WD Pocket"),
           actions: <Widget>[IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog)],
         ),
-        body: FutureBuilder<Entity>(future: _entity, builder: _futureBuilder));
+        body: FutureBuilder<EntityWithLabels>(future: _entity, builder: _futureBuilder));
   }
 
-  static Widget _futureBuilder(BuildContext context, AsyncSnapshot<Entity> snapshot) {
+  static Widget _futureBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) {
     if (snapshot.hasData) {
-      return EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data);
+      return EntityView(key: ValueKey(snapshot.data.entity.qid), entity: snapshot.data);
     }
     if (snapshot.hasError) {
-      return Expanded(child: Column(children: [Icon(Icons.error, size: 100), Text(snapshot.error.toString())]));
+      return Center(child: Column(children: [Icon(Icons.error, size: 100), Text(snapshot.error.toString())]));
     }
     return Center(child: CircularProgressIndicator());
   }
@@ -76,11 +84,11 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
 class EntityView extends StatelessWidget {
   EntityView({@required this.entity, Key key}) : super(key: key);
 
-  final Entity entity;
+  final EntityWithLabels entity;
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-      length: entity.type == EntityType.item ? 4 : 3,
+      length: entity.entity.type == EntityType.item ? 4 : 3,
       child: Column(
         children: <Widget>[
           Container(
@@ -89,19 +97,21 @@ class EntityView extends StatelessWidget {
                 tabs: [
                   Tab(icon: Icon(Icons.label_outline)),
                   Tab(icon: Icon(Icons.library_books)),
-                  if (entity.type == EntityType.item) Tab(icon: Icon(Icons.perm_identity)),
-                  if (entity.type == EntityType.property) Tab(icon: Icon(Icons.flag)),
-                  if (entity.type == EntityType.item) Tab(icon: Icon(Icons.link)),
+                  if (entity.entity.type == EntityType.item) Tab(icon: Icon(Icons.perm_identity)),
+                  if (entity.entity.type == EntityType.property) Tab(icon: Icon(Icons.flag)),
+                  if (entity.entity.type == EntityType.item) Tab(icon: Icon(Icons.link)),
                 ],
               )),
           Expanded(
             child: TabBarView(
               children: [
                 EntityLabellingView(entity: entity),
-                EntityClaimView(orderedClaims: _getClaims((dataType) => dataType != "external-id")),
-                if (entity.type == EntityType.item) EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "external-id")),
-                if (entity.type == EntityType.property) EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "!!TODO: property constraints")),
-                if (entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: (entity as Item).siteLinks.entries.toList())
+                EntityClaimView(orderedClaims: _getClaims((dataType) => dataType != "external-id"), labels: entity.labels),
+                if (entity.entity.type == EntityType.item)
+                  EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "external-id"), labels: entity.labels),
+                if (entity.entity.type == EntityType.property)
+                  EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "!!TODO: property constraints"), labels: entity.labels),
+                if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: (entity.entity as Item).siteLinks.entries.toList())
               ],
             ),
           )
@@ -110,7 +120,7 @@ class EntityView extends StatelessWidget {
 
   List<MapEntry<String, List<Claim>>> _getClaims(bool dataTypeFilter(String dataType)) {
     // TODO: This filters on actual values, it should rather filter on property definitions, since properties with no value snaks appear everywhere right now
-    return entity.claims.entries
+    return entity.entity.claims.entries
         .where((claim) => !claim.value
             .where((claimValue) => claimValue.mainSnak is ValueSnak)
             .every((claimValue) => !dataTypeFilter((claimValue.mainSnak as ValueSnak).dataType)))
@@ -119,13 +129,15 @@ class EntityView extends StatelessWidget {
 }
 
 class EntityLabellingView extends StatelessWidget {
-  EntityLabellingView({@required Entity entity, Key key})
+  EntityLabellingView({@required EntityWithLabels entity, Key key})
       : this.entity = entity,
-        this._labellingLanguages =
-            Set<String>.from(entity.labels.keys).union(Set<String>.from(entity.descriptions.keys)).union(Set<String>.from(entity.aliases.keys)).toList(),
+        this._labellingLanguages = Set<String>.from(entity.entity.labels.keys)
+            .union(Set<String>.from(entity.entity.descriptions.keys))
+            .union(Set<String>.from(entity.entity.aliases.keys))
+            .toList(),
         super(key: key);
 
-  final Entity entity;
+  final EntityWithLabels entity;
   final List<String> _labellingLanguages;
 
   @override
@@ -141,17 +153,18 @@ class EntityLabellingView extends StatelessWidget {
         Container(
             padding: EdgeInsets.only(left: 5),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-              Text(entity.labels[language] ?? "", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(entity.descriptions[language] ?? "", style: TextStyle(fontStyle: FontStyle.italic)),
-              Text(entity.aliases[language]?.join("|") ?? ""),
+              Text(entity.entity.labels[language] ?? "", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(entity.entity.descriptions[language] ?? "", style: TextStyle(fontStyle: FontStyle.italic)),
+              Row(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
             ]))
       ]);
 }
 
 class EntityClaimView extends StatelessWidget {
-  const EntityClaimView({@required this.orderedClaims, Key key}) : super(key: key);
+  const EntityClaimView({@required this.orderedClaims, @required this.labels, Key key}) : super(key: key);
 
   final List<MapEntry<String, List<Claim>>> orderedClaims;
+  final Map<String, String> labels;
 
   @override
   Widget build(BuildContext context) => ListView.builder(
@@ -161,11 +174,11 @@ class EntityClaimView extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 5),
           child: _buildClaimWidget(context, orderedClaims[index].key, orderedClaims[index].value)));
 
-  static Widget _buildClaimWidget(BuildContext context, String propertyId, List<Claim> claims) {
+  Widget _buildClaimWidget(BuildContext context, String propertyId, List<Claim> claims) {
     final List<Widget> claimWidgets = claims.map((claim) => ListTile(key: ValueKey(claim.id), title: Text(claim.toString()))).toList(growable: false);
 
     return Column(children: <Widget>[
-      Text(entitySource.getPropertyLabel(propertyId), style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
+      Text(labels[propertyId], style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
       Container(padding: EdgeInsets.only(left: 5), child: Column(children: claimWidgets))
     ]);
   }

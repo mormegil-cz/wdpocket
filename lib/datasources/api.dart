@@ -4,19 +4,24 @@ import 'dart:io';
 import 'package:meta/meta.dart';
 import 'package:package_info/package_info.dart';
 
-import 'model.dart';
-import 'util.dart';
+import '../models/model.dart';
+import '../util.dart';
 
 abstract class EntitySource {
   Future<Entity> getEntity(String qid, bool forceReload);
+
+  Future<Map<String, String>> getEntityLabels(Iterable<String> ids);
+
+  Future<String> getPropertyLabel(String id) async => (await getEntityLabels([id]))[id];
 }
 
-class WikibaseApi implements EntitySource {
+class WikibaseApi extends EntitySource {
   // TODO: Fix for public release
   static const String _responsibleUser = "petr.kadlec@gmail.com";
   static Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
-  static final String _platformInfoString =
-      "(${Platform.operatingSystem}/${Platform.operatingSystemVersion}) Dart/${Platform.version} (run by <$_responsibleUser>)";
+
+  // TODO: Add Flutter/Dart version?
+  static final String _platformInfoString = "(${Platform.operatingSystem}/${Platform.operatingSystemVersion}) (run by <$_responsibleUser>)";
 
   final Map<String, String> _propertyLabels = {};
   final List<String> languages;
@@ -34,17 +39,9 @@ class WikibaseApi implements EntitySource {
     request.headers.add("From", _responsibleUser);
     final response = await request.close();
 
-    return await utf8.decoder.bind(response).join();
-  }
+    print(await _getUserAgentString());
 
-  String _getLocalizedLabel(String id, Map<String, String> labels) {
-    for (final language in languages) {
-      final localized = labels[language];
-      if (localized != null && localized.isNotEmpty) {
-        return localized;
-      }
-    }
-    return id;
+    return await utf8.decoder.bind(response).join();
   }
 
   Future<Map<String, Entity>> _getEntities(Iterable<String> qids, [String params = ""]) async {
@@ -56,18 +53,22 @@ class WikibaseApi implements EntitySource {
     return entityMap.map((qid, entityJson) => MapEntry(qid, Entity.fromParsedJson(entityJson)));
   }
 
-  Future loadPropertyDefinitions(Iterable<String> ids) async {
-    if (ids.isEmpty) return;
+  @override
+  Future<Map<String, String>> getEntityLabels(Iterable<String> ids) async {
+    if (ids.isEmpty) return {};
 
+    final Map<String, String> result = {};
     for (final List<String> idBatch in split(ids, 50)) {
-      var propertyLabels = await _getEntities(idBatch, "&props=labels&languages=${languages.join("%7C")}");
+      final entityLabels = await _getEntities(idBatch, "&props=labels&languages=${languages.join("%7C")}");
 
-      for (Property property in propertyLabels.values) {
-        _propertyLabels[property.qid] = _getLocalizedLabel(property.qid, property.labels);
+      for (final entity in entityLabels.values) {
+        result[entity.qid] = getLocalizedLabel(entity.labels, languages) ?? entity.qid;
       }
     }
+    return result;
   }
 
+  @override
   Future<Entity> getEntity(String qid, bool forceReload) async {
     Map<String, Entity> entities;
     try {
@@ -83,16 +84,6 @@ class WikibaseApi implements EntitySource {
       throw HttpException("Entity $qid not found");
     }
 
-    final Set<String> propertiesToLoad = entity.collectAllPropertiesUsed();
-
-    if (!forceReload) {
-      propertiesToLoad.removeWhere(_propertyLabels.containsKey);
-    }
-
-    await loadPropertyDefinitions(propertiesToLoad);
-
     return entity;
   }
-
-  String getPropertyLabel(String id) => _propertyLabels[id] ?? id;
 }
