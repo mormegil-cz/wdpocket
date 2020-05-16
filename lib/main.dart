@@ -155,7 +155,7 @@ class EntityLabellingView extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
               Text(entity.entity.labels[language] ?? "", style: TextStyle(fontWeight: FontWeight.bold)),
               Text(entity.entity.descriptions[language] ?? "", style: TextStyle(fontStyle: FontStyle.italic)),
-              Row(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
+              Wrap(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
             ]))
       ]);
 }
