@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:meta/meta.dart';
 
+import 'util.dart';
 import 'model.dart';
 
 abstract class EntitySource {
@@ -51,10 +52,12 @@ class WikibaseApi implements EntitySource {
   Future loadPropertyDefinitions(Iterable<String> ids) async {
     if (ids.isEmpty) return;
 
-    var propertyLabels = await _getEntities(ids, "&props=labels&languages=${languages.join("%7C")}");
+    for (final List<String> idBatch in split(ids, 50)) {
+      var propertyLabels = await _getEntities(idBatch, "&props=labels&languages=${languages.join("%7C")}");
 
-    for (Property property in propertyLabels.values) {
-      _propertyLabels[property.qid] = _getLocalizedLabel(property.qid, property.labels);
+      for (Property property in propertyLabels.values) {
+        _propertyLabels[property.qid] = _getLocalizedLabel(property.qid, property.labels);
+      }
     }
   }
 

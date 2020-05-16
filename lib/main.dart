@@ -44,7 +44,7 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
     setState(() {
       print("Requesting load of $qid");
       _qid = qid;
-      _entity = entitySource.getEntity(qid, forceReload);
+      _entity = Future.delayed(Duration(seconds: 1)).then((value) => entitySource.getEntity(qid, forceReload));
     });
   }
 
@@ -59,11 +59,17 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
           title: Text(_qid ?? "WD Pocket"),
           actions: <Widget>[IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog)],
         ),
-        body: FutureBuilder<Entity>(
-            future: _entity,
-            builder: (context, snapshot) => snapshot.hasData
-                ? EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data)
-                : Center(child: Icon(snapshot.hasError ? Icons.error : Icons.home, size: 100))));
+        body: FutureBuilder<Entity>(future: _entity, builder: _futureBuilder));
+  }
+
+  static Widget _futureBuilder(BuildContext context, AsyncSnapshot<Entity> snapshot) {
+    if (snapshot.hasData) {
+      return EntityView(key: ValueKey(snapshot.data.qid), entity: snapshot.data);
+    }
+    if (snapshot.hasError) {
+      return Expanded(child: Column(children: [Icon(Icons.error, size: 100), Text(snapshot.error.toString())]));
+    }
+    return Center(child: CircularProgressIndicator());
   }
 }
 
