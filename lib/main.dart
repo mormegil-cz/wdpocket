@@ -33,7 +33,7 @@ class WdPocketAppHome extends StatefulWidget {
 
 class WdPocketAppHomeState extends State<WdPocketAppHome> {
   String _qid;
-  Future<EntityWithLabels> _entity;
+  Future<EntityWithLabels> _data;
 
   @override
   void initState() {
@@ -46,13 +46,13 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
     setState(() {
       print("Requesting load of $qid");
       _qid = qid;
-      _entity = _loadEntityWithLabels(qid, forceReload);
+      _data = _loadEntityWithLabels(qid, forceReload);
     });
   }
 
   Future<EntityWithLabels> _loadEntityWithLabels(String qid, bool forceReload) async {
     final entity = await entitySource.getEntity(qid, forceReload);
-    final labels = await entitySource.getEntityLabels(entity.collectAllPropertiesUsed());
+    final labels = await entitySource.getEntityLabels(entity.collectAllReferredEntities());
     return EntityWithLabels(entity, labels);
   }
 
@@ -67,7 +67,7 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
           title: Text(_qid ?? "WD Pocket"),
           actions: <Widget>[IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog)],
         ),
-        body: FutureBuilder<EntityWithLabels>(future: _entity, builder: _futureBuilder));
+        body: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureBuilder));
   }
 
   static Widget _futureBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) {
@@ -148,16 +148,19 @@ class EntityLabellingView extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 5),
           child: _buildLanguageWidget(context, _labellingLanguages[index])));
 
-  Widget _buildLanguageWidget(BuildContext context, String language) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
-        Text(language, style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
-        Container(
-            padding: EdgeInsets.only(left: 5),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-              Text(entity.entity.labels[language] ?? "", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(entity.entity.descriptions[language] ?? "", style: TextStyle(fontStyle: FontStyle.italic)),
-              Wrap(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
-            ]))
-      ]);
+  Widget _buildLanguageWidget(BuildContext context, String language) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+      Text(language, style: textTheme.headline5),
+      Container(
+          padding: EdgeInsets.only(left: 5),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+            Text(entity.entity.labels[language] ?? "", style: textTheme.bodyText1),
+            Text(entity.entity.descriptions[language] ?? "", style: textTheme.bodyText2),
+            Wrap(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
+          ]))
+    ]);
+  }
 }
 
 class EntityClaimView extends StatelessWidget {
@@ -171,15 +174,98 @@ class EntityClaimView extends StatelessWidget {
       itemCount: orderedClaims.length,
       itemBuilder: (context, index) => Container(
           decoration: BoxDecoration(border: Border(top: BorderSide())),
-          padding: EdgeInsets.symmetric(vertical: 5),
+          padding: EdgeInsets.all(5),
           child: _buildClaimWidget(context, orderedClaims[index].key, orderedClaims[index].value)));
 
   Widget _buildClaimWidget(BuildContext context, String propertyId, List<Claim> claims) {
-    final List<Widget> claimWidgets = claims.map((claim) => ListTile(key: ValueKey(claim.id), title: Text(claim.toString()))).toList(growable: false);
+    final textTheme = Theme.of(context).textTheme;
+    final List<Widget> claimWidgets = claims.map((claim) => _buildClaimViewWidget(claim, textTheme)).toList(growable: false);
 
     return Column(children: <Widget>[
-      Text(labels[propertyId], style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 1.3, fontWeightDelta: 3)),
+      Text(labels[propertyId], style: textTheme.headline5),
       Container(padding: EdgeInsets.only(left: 5), child: Column(children: claimWidgets))
+    ]);
+  }
+
+  Widget _buildClaimViewWidget(Claim claim, TextTheme textTheme) => Card(
+          child: SizedBox(
+              child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          ListTile(
+            title: _buildSnakViewWidget(claim.mainSnak, textTheme),
+            subtitle: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2),
+          )
+        ],
+      )));
+
+  Widget _buildSnakViewWidget(Snak snak, TextTheme textTheme) {
+    switch (snak.type) {
+      case SnakType.noValue:
+        return Icon(Icons.not_interested);
+      case SnakType.someValue:
+        return Icon(Icons.device_unknown);
+      case SnakType.value:
+        final ValueSnak valueSnak = snak;
+        return _buildDataValueViewWidget(valueSnak.value, textTheme);
+      default:
+        throw new UnsupportedError("Unsupported snak type");
+    }
+  }
+
+  Widget _buildDataValueViewWidget(DataValue value, TextTheme textTheme) {
+    switch (value.type) {
+      case ValueType.string:
+      case ValueType.coordinate:
+      case ValueType.time:
+        return Text(value.toString(), style: textTheme.headline5);
+      case ValueType.entityId:
+        return EntityIdView(value: value, labels: labels);
+      case ValueType.monolingualText:
+        return MonolingualTextView(value: value);
+      case ValueType.quantity:
+        return QuantityView(value: value, labels: labels);
+      default:
+        throw new UnsupportedError("Unsupported value type");
+    }
+  }
+}
+
+class EntityIdView extends StatelessWidget {
+  const EntityIdView({Key key, @required this.value, @required this.labels}) : super(key: key);
+
+  final EntityIdValue value;
+  final Map<String, String> labels;
+
+  @override
+  Widget build(BuildContext context) => Text(labels[value.qid]);
+}
+
+class MonolingualTextView extends StatelessWidget {
+  const MonolingualTextView({Key key, @required this.value}) : super(key: key);
+
+  final MonolingualText value;
+
+  @override
+  Widget build(BuildContext context) => Row(children: <Widget>[
+        Text(value.text),
+        Padding(padding: EdgeInsets.only(left: 5), child: Chip(label: Text(value.language))),
+      ]);
+}
+
+class QuantityView extends StatelessWidget {
+  const QuantityView({Key key, @required this.value, @required this.labels}) : super(key: key);
+
+  final QuantityValue value;
+  final Map<String, String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final unitQid = urlToQid(value.unit);
+    final unit = unitQid == null ? (value.unit == "1" ? null : value.unit) : (labels[unitQid] ?? unitQid);
+    return Row(children: <Widget>[
+      Text(value.amount),
+      if (unit != null) Padding(padding: EdgeInsets.only(left: 5), child: Chip(label: Text(unit))),
     ]);
   }
 }

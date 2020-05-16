@@ -9,15 +9,19 @@ enum ClaimRank { deprecated, normal, preferred }
 enum SnakType { value, someValue, noValue }
 enum ValueType { string, entityId, coordinate, quantity, time, monolingualText }
 
-abstract class _PropertyEnumerable {
-  Set<String> collectAllPropertiesUsed();
+const String wikidataUrlPrefix = "http://www.wikidata.org/entity/";
+
+String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring(wikidataUrlPrefix.length) : null;
+
+abstract class _EntityEnumerable {
+  Set<String> collectAllReferredEntities();
 }
 
 abstract class _JsonSerializable {
   Map<String, dynamic> toJsonStructure();
 }
 
-abstract class Entity implements _PropertyEnumerable, _JsonSerializable {
+abstract class Entity implements _EntityEnumerable, _JsonSerializable {
   Entity(this.qid, this.modified, this.lastRevId, this.labels, this.descriptions, this.aliases, this.claims);
 
   factory Entity.fromParsedJson(Map<String, dynamic> json) {
@@ -43,7 +47,7 @@ abstract class Entity implements _PropertyEnumerable, _JsonSerializable {
   EntityType get type;
 
   @override
-  Set<String> collectAllPropertiesUsed() => _collectAllPropertiesUsed(flatten(claims.values));
+  Set<String> collectAllReferredEntities() => _collectAllPropertiesUsed(flatten(claims.values));
 
   @override
   String toString() => qid;
@@ -118,7 +122,7 @@ class Property extends Entity {
   get type => EntityType.property;
 }
 
-class Claim implements _PropertyEnumerable, _JsonSerializable {
+class Claim implements _EntityEnumerable, _JsonSerializable {
   Claim({@required this.id, @required this.rank, @required this.mainSnak, @required this.qualifiers, @required this.references});
 
   factory Claim.fromParsedJson(Map<String, dynamic> json) => Claim(
@@ -140,8 +144,8 @@ class Claim implements _PropertyEnumerable, _JsonSerializable {
   String toString() => mainSnak.toString();
 
   @override
-  Set<String> collectAllPropertiesUsed() =>
-      mainSnak.collectAllPropertiesUsed().union(_collectAllPropertiesUsed(flatten(qualifiers.values))).union(_collectAllPropertiesUsed(references));
+  Set<String> collectAllReferredEntities() =>
+      mainSnak.collectAllReferredEntities().union(_collectAllPropertiesUsed(flatten(qualifiers.values))).union(_collectAllPropertiesUsed(references));
 
   @override
   Map<String, dynamic> toJsonStructure() => {
@@ -154,7 +158,7 @@ class Claim implements _PropertyEnumerable, _JsonSerializable {
       };
 }
 
-class Reference implements _PropertyEnumerable, _JsonSerializable {
+class Reference implements _EntityEnumerable, _JsonSerializable {
   Reference({this.hash, this.snaks});
 
   factory Reference.fromParsedJson(Map<String, dynamic> json) =>
@@ -165,7 +169,7 @@ class Reference implements _PropertyEnumerable, _JsonSerializable {
   LinkedHashMap<String, List<Snak>> snaks;
 
   @override
-  Set<String> collectAllPropertiesUsed() => _collectAllPropertiesUsed(flatten(snaks.values));
+  Set<String> collectAllReferredEntities() => _collectAllPropertiesUsed(flatten(snaks.values));
 
   @override
   Map<String, dynamic> toJsonStructure() => {
@@ -175,7 +179,7 @@ class Reference implements _PropertyEnumerable, _JsonSerializable {
       };
 }
 
-abstract class Snak implements _PropertyEnumerable, _JsonSerializable {
+abstract class Snak implements _EntityEnumerable, _JsonSerializable {
   Snak({@required this.property, @required this.hash});
 
   factory Snak.fromParsedJson(Map<String, dynamic> json) {
@@ -197,7 +201,7 @@ abstract class Snak implements _PropertyEnumerable, _JsonSerializable {
   SnakType get type;
 
   @override
-  Set<String> collectAllPropertiesUsed() => {property};
+  Set<String> collectAllReferredEntities() => {property};
 }
 
 class ValueSnak extends Snak {
@@ -219,6 +223,9 @@ class ValueSnak extends Snak {
         r"datatype": dataType,
         r"datavalue": value.toJsonStructure(),
       };
+
+  @override
+  Set<String> collectAllReferredEntities() => {property, ...value.collectAllReferredEntities()};
 
   @override
   String toString() => value.toString();
@@ -275,7 +282,7 @@ class SiteLink implements _JsonSerializable {
   String toString() => pageTitle;
 }
 
-abstract class DataValue implements _JsonSerializable {
+abstract class DataValue implements _JsonSerializable, _EntityEnumerable {
   ValueType get type;
 
   DataValue();
@@ -298,6 +305,9 @@ abstract class DataValue implements _JsonSerializable {
         throw UnimplementedError();
     }
   }
+
+  @override
+  Set<String> collectAllReferredEntities() => {};
 }
 
 class StringValue extends DataValue {
@@ -341,6 +351,9 @@ class EntityIdValue extends DataValue {
 
   @override
   String toString() => qid;
+
+  @override
+  Set<String> collectAllReferredEntities() => {qid};
 }
 
 class MonolingualText extends DataValue {
@@ -394,6 +407,9 @@ class TimeValue extends DataValue {
       };
 
   @override
+  Set<String> collectAllReferredEntities() => _urlToQidSet(calendarModel);
+
+  @override
   String toString() => "${time.toIso8601String()}/$precision";
 }
 
@@ -422,6 +438,9 @@ class QuantityValue extends DataValue {
           "unit": unit,
         }
       };
+
+  @override
+  Set<String> collectAllReferredEntities() => _urlToQidSet(unit);
 
   @override
   String toString() => lowerBound == null ? "$amount $unit" : "$amount <$lowerBound; $upperBound> $unit";
@@ -453,6 +472,9 @@ class CoordinateValue extends DataValue {
           "globe": globe,
         }
       };
+
+  @override
+  Set<String> collectAllReferredEntities() => _urlToQidSet(globe);
 
   @override
   String toString() => "$latitude, $longitude /$precision";
@@ -538,5 +560,10 @@ List<Reference> _referencesFromJson(List<dynamic> json) => json == null ? [] : j
 
 List<String> _stringListFromJson(List<dynamic> json) => json.cast<String>().toList();
 
-Set<String> _collectAllPropertiesUsed(Iterable<_PropertyEnumerable> collection) =>
-    collection.fold(Set<String>(), (currSet, item) => currSet.union(item.collectAllPropertiesUsed()));
+Set<String> _collectAllPropertiesUsed(Iterable<_EntityEnumerable> collection) =>
+    collection.fold(Set<String>(), (currSet, item) => currSet.union(item.collectAllReferredEntities()));
+
+Set<String> _urlToQidSet(String url) {
+  final String qid = urlToQid(url);
+  return qid == null ? {} : {qid};
+}
