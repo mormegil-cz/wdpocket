@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_data/models/entity_with_labels.dart';
+import 'package:pocket_data/util.dart';
 
 import 'datasources/api.dart';
 import 'datasources/cached_api.dart';
 import 'models/model.dart';
 
 // TODO: Language localization/configuration
-final EntitySource entitySource = CachedWikibaseApi(languages: ["cs", "sk", "en"]);
+final List<String> userPreferredLanguages = ["cs", "sk", "en"];
+final EntitySource entitySource = CachedWikibaseApi(languages: userPreferredLanguages);
 
 void main() async {
   runApp(WdPocketApp());
@@ -53,7 +55,14 @@ class WdPocketAppHomeState extends State<WdPocketAppHome> {
   Future<EntityWithLabels> _loadEntityWithLabels(String qid, bool forceReload) async {
     final entity = await entitySource.getEntity(qid, forceReload);
     final labels = await entitySource.getEntityLabels(entity.collectAllReferredEntities());
-    return EntityWithLabels(entity, labels);
+
+    final labellingLanguages = Set<String>.from(entity.labels.keys)
+        .union(Set<String>.from(entity.descriptions.keys))
+        .union(Set<String>.from(entity.aliases.keys))
+        .toList();
+    labellingLanguages.sort(comparerByPreferredList(userPreferredLanguages, (a, b) => a.compareTo(b)));
+
+    return EntityWithLabels(entity, labels, labellingLanguages);
   }
 
   void _showQidDialog() async {
@@ -130,36 +139,30 @@ class EntityView extends StatelessWidget {
 
 class EntityLabellingView extends StatelessWidget {
   EntityLabellingView({@required EntityWithLabels entity, Key key})
-      : this.entity = entity,
-        this._labellingLanguages = Set<String>.from(entity.entity.labels.keys)
-            .union(Set<String>.from(entity.entity.descriptions.keys))
-            .union(Set<String>.from(entity.entity.aliases.keys))
-            .toList(),
+      : this.data = entity,
         super(key: key);
 
-  final EntityWithLabels entity;
-  final List<String> _labellingLanguages;
+  final EntityWithLabels data;
 
   @override
   Widget build(BuildContext context) => ListView.builder(
-      itemCount: _labellingLanguages.length,
+      itemCount: data.sortedLabellingLanguages.length,
       itemBuilder: (content, index) => Container(
-          decoration: BoxDecoration(border: Border(top: BorderSide())),
-          padding: EdgeInsets.symmetric(vertical: 5),
-          child: _buildLanguageWidget(context, _labellingLanguages[index])));
+          //decoration: BoxDecoration(border: Border(top: BorderSide())),
+          padding: EdgeInsets.all(5),
+          child: _buildLanguageWidget(context, data.sortedLabellingLanguages[index])));
 
   Widget _buildLanguageWidget(BuildContext context, String language) {
     final textTheme = Theme.of(context).textTheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
-      Text(language, style: textTheme.headline5),
-      Container(
-          padding: EdgeInsets.only(left: 5),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-            Text(entity.entity.labels[language] ?? "", style: textTheme.bodyText1),
-            Text(entity.entity.descriptions[language] ?? "", style: textTheme.bodyText2),
-            Wrap(children: (entity.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
-          ]))
-    ]);
+    return Card(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ListTile(
+        leading: CircleAvatar(child: Text(language)),
+        title: Text(data.entity.labels[language] ?? "", style: textTheme.bodyText1),
+        subtitle: Text(data.entity.descriptions[language] ?? "", style: textTheme.bodyText2),
+      ),
+      Wrap(children: (data.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
+    ]));
   }
 }
 
