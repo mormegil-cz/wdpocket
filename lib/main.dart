@@ -52,7 +52,13 @@ class WdPocketAppHome extends StatelessWidget {
       appBar: AppBar(
         title: Text("WD Pocket"),
       ),
-      body: Center(child: IconButton(icon: Icon(Icons.home), iconSize: 70, onPressed: () => EntityViewScreen.navigateToQid(context, "Q42"))));
+      body: Center(child: IconButton(icon: Icon(Icons.home), iconSize: 70, onPressed: () => _navigateToQid(context, "Q42"))));
+}
+
+Future<Object> _navigateToQid(BuildContext context, String qid) => Navigator.pushNamed(context, EntityViewScreen.routeName, arguments: qid);
+
+mixin _QidNavigationOnState<T extends StatefulWidget> on State<T> {
+  Future<Object> navigateToQid(String qid) => _navigateToQid(this.context, qid);
 }
 
 class EntityViewScreen extends StatefulWidget {
@@ -62,8 +68,6 @@ class EntityViewScreen extends StatefulWidget {
 
   EntityViewScreen.build(BuildContext context, String arguments) : this(qid: arguments);
 
-  static Future<Object> navigateToQid(BuildContext context, String qid) => Navigator.pushNamed(context, EntityViewScreen.routeName, arguments: qid);
-
   final String qid;
 
   @override
@@ -72,7 +76,7 @@ class EntityViewScreen extends StatefulWidget {
   Widget routeBuilder(BuildContext _) => EntityViewScreen(qid: qid);
 }
 
-class EntityViewScreenState extends State<EntityViewScreen> {
+class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationOnState<EntityViewScreen> {
   EntityViewScreenState(this.qid);
 
   final String qid;
@@ -97,23 +101,24 @@ class EntityViewScreenState extends State<EntityViewScreen> {
   }
 
   void _showQidDialog() async {
-    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", (qid) => EntityViewScreen.navigateToQid(context, qid)));
+    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", navigateToQid));
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          title: Text(qid),
-          actions: <Widget>[
-            IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog),
-            IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launch(qidToUrl(qid)))
-          ],
-        ),
-        body: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureBuilder));
-  }
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(
+        title: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureTitleBuilder),
+        actions: <Widget>[
+          IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog),
+          IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launch(qidToUrl(qid)))
+        ],
+      ),
+      body: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureEntityViewBuilder));
 
-  static Widget _futureBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) {
+  Widget _futureTitleBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) =>
+      snapshot.hasData ? Text("$qid: ${snapshot.data.labels[qid]}") : Text(qid);
+
+  static Widget _futureEntityViewBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) {
     if (snapshot.hasData) {
       return EntityView(key: ValueKey(snapshot.data.entity.qid), entity: snapshot.data);
     }
@@ -216,7 +221,7 @@ class EntityClaimView extends StatelessWidget {
 
   Widget _buildClaimWidget(BuildContext context, String propertyId, List<Claim> claims) {
     final textTheme = Theme.of(context).textTheme;
-    final List<Widget> claimWidgets = claims.map((claim) => _buildClaimViewWidget(claim, textTheme)).toList(growable: false);
+    final List<Widget> claimWidgets = claims.map((claim) => _buildClaimViewWidget(context, claim, textTheme)).toList(growable: false);
 
     return Column(children: <Widget>[
       Text(labels[propertyId], style: textTheme.headline5),
@@ -224,14 +229,15 @@ class EntityClaimView extends StatelessWidget {
     ]);
   }
 
-  Widget _buildClaimViewWidget(Claim claim, TextTheme textTheme) => Card(
+  Widget _buildClaimViewWidget(BuildContext context, Claim claim, TextTheme textTheme) => Card(
           child: SizedBox(
               child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           ListTile(
             title: _buildSnakViewWidget(claim.mainSnak, textTheme),
-            subtitle: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2),
+            subtitle: InkWell(
+                child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property)),
           )
         ],
       )));
@@ -275,7 +281,7 @@ class EntityIdView extends StatelessWidget {
   final Map<String, String> labels;
 
   @override
-  Widget build(BuildContext context) => InkWell(child: Text(labels[value.qid]), onTap: () => EntityViewScreen.navigateToQid(context, value.qid));
+  Widget build(BuildContext context) => InkWell(child: Text(labels[value.qid]), onTap: () => _navigateToQid(context, value.qid));
 }
 
 class MonolingualTextView extends StatelessWidget {
@@ -298,11 +304,18 @@ class QuantityView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unitQid = urlToQid(value.unit);
-    final unit = unitQid == null ? (value.unit == "1" ? null : value.unit) : (labels[unitQid] ?? unitQid);
+    var unitUrl = value.unit;
+    final unitQid = urlToQid(unitUrl);
+    final unit = unitQid == null ? (unitUrl == "1" ? null : unitUrl) : (labels[unitQid] ?? unitQid);
     return Row(children: <Widget>[
       Text(value.amount),
-      if (unit != null) Padding(padding: EdgeInsets.only(left: 5), child: Chip(label: Text(unit))),
+      if (unit != null)
+        Padding(
+            padding: EdgeInsets.only(left: 5),
+            child: ActionChip(
+              label: Text(unit),
+              onPressed: () => _navigateToQid(context, unitQid),
+            )),
     ]);
   }
 }

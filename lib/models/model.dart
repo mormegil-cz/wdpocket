@@ -49,7 +49,7 @@ abstract class Entity implements _EntityEnumerable, _JsonSerializable {
   EntityType get type;
 
   @override
-  Set<String> collectAllReferredEntities() => _collectAllPropertiesUsed(flatten(claims.values));
+  Set<String> collectAllReferredEntities() => {qid}.union(_collectAllPropertiesUsed(flatten(claims.values)));
 
   @override
   String toString() => qid;
