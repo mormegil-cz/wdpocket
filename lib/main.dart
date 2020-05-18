@@ -327,8 +327,12 @@ class EntitySiteLinksView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView.builder(
-      itemBuilder: (content, index) => ListTile(leading: Text(orderedLinks[index].key), title: Text(orderedLinks[index].value.pageTitle)),
+      itemBuilder: (content, index) => ListTile(
+          leading:  Text(orderedLinks[index].key),
+          title: InkWell(child: Text(orderedLinks[index].value.pageTitle), onTap: () => launch(_siteLinkUrl(orderedLinks[index].key, orderedLinks[index].value)))),
       itemCount: orderedLinks.length);
+
+  static String _siteLinkUrl(String site, SiteLink link) => wikiSiteBaseUrl(site) + encodePageTitleToUrl(link.pageTitle);
 }
 
 WidgetBuilder _createTextInputDialogBuilder(String caption, String hintText, void onDataEntered(String data)) {

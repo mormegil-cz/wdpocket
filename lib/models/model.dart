@@ -15,6 +15,33 @@ String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring
 
 String qidToUrl(String qid) => wikidataUrlPrefix + qid;
 
+final Map<String, String> wikiSiteSuffixes = {
+  "wiktionary": "https://@.wikiquote.org",
+  "wikiquote": "https://@.wikiquote.org",
+  "wikisource": "https://@.wikiquote.org",
+  "wikibooks": "https://@.wikiquote.org",
+  "wikinews": "https://@.wikiquote.org",
+  "wikiversity": "https://@.wikiquote.org",
+  "wikivoyage": "https://@.wikiquote.org",
+};
+final Map<String, String> wikiSites = {
+  "commonswiki": "https://commons.wikimedia.org",
+  "mediawikiwiki": "https://www.mediawiki.org",
+  "metawiki": "https://meta.wikimedia.org",
+  "wikidatawiki": "https://www.wikidata.org",
+};
+
+String wikiSiteBaseUrl(String siteId) {
+  final String directWikiSite = wikiSites[siteId];
+  if (directWikiSite != null) return "$directWikiSite/wiki/";
+  for (final MapEntry<String, String> wikiSite in wikiSiteSuffixes.entries) {
+    if (siteId.endsWith(wikiSite.key)) return wikiSite.value.replaceFirst("@", siteId.substring(0, siteId.length - wikiSite.key.length)) + "/wiki/";
+  }
+  return siteId;
+}
+
+String encodePageTitleToUrl(String pageTitle) => Uri.encodeComponent(pageTitle.replaceAll(" ", "_"));
+
 abstract class _EntityEnumerable {
   Set<String> collectAllReferredEntities();
 }
