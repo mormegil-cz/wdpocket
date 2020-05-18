@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_data/models/entity_with_labels.dart';
 import 'package:pocket_data/util.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'datasources/api.dart';
 import 'datasources/cached_api.dart';
@@ -25,56 +26,89 @@ class WdPocketApp extends StatelessWidget {
         // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: WdPocketAppHome());
+      initialRoute: WdPocketAppHome.routeName,
+      onGenerateRoute: (settings) {
+        final Object arguments = settings.arguments;
+        switch (settings.name) {
+          case WdPocketAppHome.routeName:
+            return MaterialPageRoute(builder: (context) => WdPocketAppHome.build(context, arguments));
+          case EntityViewScreen.routeName:
+            return MaterialPageRoute(builder: (context) => EntityViewScreen.build(context, arguments));
+          default:
+            throw new UnsupportedError("Route ${settings.name} not supported");
+        }
+      });
 }
 
-class WdPocketAppHome extends StatefulWidget {
+class WdPocketAppHome extends StatelessWidget {
+  static const routeName = '/';
+
+  WdPocketAppHome();
+
+  WdPocketAppHome.build(BuildContext context, Object arguments) : this();
+
   @override
-  State<StatefulWidget> createState() => WdPocketAppHomeState();
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(
+        title: Text("WD Pocket"),
+      ),
+      body: Center(child: IconButton(icon: Icon(Icons.home), iconSize: 70, onPressed: () => EntityViewScreen.navigateToQid(context, "Q42"))));
 }
 
-class WdPocketAppHomeState extends State<WdPocketAppHome> {
-  String _qid;
+class EntityViewScreen extends StatefulWidget {
+  static const routeName = '/item';
+
+  const EntityViewScreen({Key key, this.qid}) : super(key: key);
+
+  EntityViewScreen.build(BuildContext context, String arguments) : this(qid: arguments);
+
+  static Future<Object> navigateToQid(BuildContext context, String qid) => Navigator.pushNamed(context, EntityViewScreen.routeName, arguments: qid);
+
+  final String qid;
+
+  @override
+  State<StatefulWidget> createState() => EntityViewScreenState(qid);
+
+  Widget routeBuilder(BuildContext _) => EntityViewScreen(qid: qid);
+}
+
+class EntityViewScreenState extends State<EntityViewScreen> {
+  EntityViewScreenState(this.qid);
+
+  final String qid;
   Future<EntityWithLabels> _data;
 
   @override
   void initState() {
     super.initState();
-    print("initState()");
-    requestLoadEntity("Q42", false);
-  }
-
-  void requestLoadEntity(String qid, bool forceReload) {
-    setState(() {
-      print("Requesting load of $qid");
-      _qid = qid;
-      _data = _loadEntityWithLabels(qid, forceReload);
-    });
+    print("Requesting load of $qid");
+    _data = _loadEntityWithLabels(qid, false);
   }
 
   Future<EntityWithLabels> _loadEntityWithLabels(String qid, bool forceReload) async {
     final entity = await entitySource.getEntity(qid, forceReload);
     final labels = await entitySource.getEntityLabels(entity.collectAllReferredEntities());
 
-    final labellingLanguages = Set<String>.from(entity.labels.keys)
-        .union(Set<String>.from(entity.descriptions.keys))
-        .union(Set<String>.from(entity.aliases.keys))
-        .toList();
+    final labellingLanguages =
+        Set<String>.from(entity.labels.keys).union(Set<String>.from(entity.descriptions.keys)).union(Set<String>.from(entity.aliases.keys)).toList();
     labellingLanguages.sort(comparerByPreferredList(userPreferredLanguages, (a, b) => a.compareTo(b)));
 
     return EntityWithLabels(entity, labels, labellingLanguages);
   }
 
   void _showQidDialog() async {
-    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", (qid) => requestLoadEntity(qid, false)));
+    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", (qid) => EntityViewScreen.navigateToQid(context, qid)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text(_qid ?? "WD Pocket"),
-          actions: <Widget>[IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog)],
+          title: Text(qid),
+          actions: <Widget>[
+            IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog),
+            IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launch(qidToUrl(qid)))
+          ],
         ),
         body: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureBuilder));
   }
@@ -241,7 +275,7 @@ class EntityIdView extends StatelessWidget {
   final Map<String, String> labels;
 
   @override
-  Widget build(BuildContext context) => Text(labels[value.qid]);
+  Widget build(BuildContext context) => InkWell(child: Text(labels[value.qid]), onTap: () => EntityViewScreen.navigateToQid(context, value.qid));
 }
 
 class MonolingualTextView extends StatelessWidget {

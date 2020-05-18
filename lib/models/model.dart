@@ -13,6 +13,8 @@ const String wikidataUrlPrefix = "http://www.wikidata.org/entity/";
 
 String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring(wikidataUrlPrefix.length) : null;
 
+String qidToUrl(String qid) => wikidataUrlPrefix + qid;
+
 abstract class _EntityEnumerable {
   Set<String> collectAllReferredEntities();
 }
