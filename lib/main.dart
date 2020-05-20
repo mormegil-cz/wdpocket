@@ -100,8 +100,12 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
     return EntityWithLabels(entity, labels, labellingLanguages);
   }
 
-  void _showQidDialog() async {
-    await showDialog(context: context, builder: _createTextInputDialogBuilder("Load entity", "Q123456", navigateToQid));
+  Future<void> _processSearch() async {
+    print("Going to search");
+    final String qid = await showSearch(context: context, delegate: EntitySearchDelegate());
+    if (qid != null) {
+      navigateToQid(qid);
+    }
   }
 
   @override
@@ -109,7 +113,7 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
       appBar: AppBar(
         title: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureTitleBuilder),
         actions: <Widget>[
-          IconButton(icon: Icon(Icons.search), onPressed: _showQidDialog),
+          IconButton(icon: Icon(Icons.search), onPressed: _processSearch),
           IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launch(qidToUrl(qid)))
         ],
       ),
@@ -328,8 +332,9 @@ class EntitySiteLinksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.builder(
       itemBuilder: (content, index) => ListTile(
-          leading:  Text(orderedLinks[index].key),
-          title: InkWell(child: Text(orderedLinks[index].value.pageTitle), onTap: () => launch(_siteLinkUrl(orderedLinks[index].key, orderedLinks[index].value)))),
+          leading: Text(orderedLinks[index].key),
+          title:
+              InkWell(child: Text(orderedLinks[index].value.pageTitle), onTap: () => launch(_siteLinkUrl(orderedLinks[index].key, orderedLinks[index].value)))),
       itemCount: orderedLinks.length);
 
   static String _siteLinkUrl(String site, SiteLink link) => wikiSiteBaseUrl(site) + encodePageTitleToUrl(link.pageTitle);
@@ -357,4 +362,49 @@ WidgetBuilder _createTextInputDialogBuilder(String caption, String hintText, voi
       ],
     );
   };
+}
+
+class EntitySearchDelegate extends SearchDelegate<String> {
+  @override
+  List<Widget> buildActions(BuildContext context) => null;
+
+  @override
+  Widget buildLeading(BuildContext context) => null;
+
+  @override
+  Widget buildResults(BuildContext context) => _buildSearchResults();
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+
+  Widget _buildSearchResults() => FutureBuilder(
+      future: _runSearch(query),
+      builder: _buildAsyncBuilder(
+          dataBuilder: (context, List<SearchResult> results) =>
+              ListView.builder(itemCount: results.length, itemBuilder: (context, index) => _buildSearchResult(context, results[index])),
+          errorBuilder: (context, error) => Center(
+                  child: Column(children: [
+                Icon(Icons.error),
+                Text(error.toString()),
+              ])),
+          waitingBuilder: (context) => Center(child: CircularProgressIndicator())));
+
+  Widget _buildSearchResult(BuildContext context, SearchResult result) =>
+      ListTile(title: Text(result.title), subtitle: Text(result.description), onTap: () => close(context, result.qid));
+
+  static Future<List<SearchResult>> _runSearch(String query) => query == null || query.isEmpty ? Future.value([]) : entitySource.search(query, 10);
+}
+
+AsyncWidgetBuilder<T> _buildAsyncBuilder<T>({
+  @required Widget dataBuilder(BuildContext context, T snapshotData),
+  @required Widget errorBuilder(BuildContext context, Object error),
+  @required Widget waitingBuilder(BuildContext context),
+}) {
+  Widget asyncBuilder(BuildContext context, AsyncSnapshot<T> snapshot) {
+    if (snapshot.hasData) return dataBuilder(context, snapshot.data);
+    if (snapshot.hasError) return errorBuilder(context, snapshot.error);
+    return waitingBuilder(context);
+  }
+
+  return asyncBuilder;
 }

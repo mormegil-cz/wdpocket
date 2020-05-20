@@ -7,15 +7,61 @@ import 'package:package_info/package_info.dart';
 import '../models/model.dart';
 import '../util.dart';
 
+const String wikidataUrlPrefix = "http://www.wikidata.org/entity/";
+
+String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring(wikidataUrlPrefix.length) : null;
+
+String qidToUrl(String qid) => wikidataUrlPrefix + qid;
+
+final Map<String, String> wikiSiteSuffixes = {
+  "wiktionary": "https://@.wikiquote.org",
+  "wikiquote": "https://@.wikiquote.org",
+  "wikisource": "https://@.wikiquote.org",
+  "wikibooks": "https://@.wikiquote.org",
+  "wikinews": "https://@.wikiquote.org",
+  "wikiversity": "https://@.wikiquote.org",
+  "wikivoyage": "https://@.wikiquote.org",
+};
+final Map<String, String> wikiSites = {
+  "commonswiki": "https://commons.wikimedia.org",
+  "mediawikiwiki": "https://www.mediawiki.org",
+  "metawiki": "https://meta.wikimedia.org",
+  "wikidatawiki": "https://www.wikidata.org",
+};
+
+String wikiSiteBaseUrl(String siteId) {
+  final String directWikiSite = wikiSites[siteId];
+  if (directWikiSite != null) return "$directWikiSite/wiki/";
+  for (final MapEntry<String, String> wikiSite in wikiSiteSuffixes.entries) {
+    if (siteId.endsWith(wikiSite.key)) return wikiSite.value.replaceFirst("@", siteId.substring(0, siteId.length - wikiSite.key.length)) + "/wiki/";
+  }
+  return siteId;
+}
+
+String encodePageTitleToUrl(String pageTitle) => Uri.encodeComponent(pageTitle.replaceAll(" ", "_"));
+
 abstract class EntitySource {
   Future<Entity> getEntity(String qid, bool forceReload);
 
   Future<Map<String, String>> getEntityLabels(Iterable<String> ids);
 
   Future<String> getPropertyLabel(String id) async => (await getEntityLabels([id]))[id];
+
+  Future<List<SearchResult>> search(String query, int searchLimit);
+}
+
+class SearchResult {
+  final String qid;
+  final String title;
+  final String description;
+
+  const SearchResult(this.qid, this.title, this.description);
 }
 
 class WikibaseApi extends EntitySource {
+  static const String _wikibaseServer = "https://www.wikidata.org";
+  static const String _wikibaseApi = "$_wikibaseServer/w/api.php";
+
   // TODO: Fix for public release
   static const String _responsibleUser = "petr.kadlec@gmail.com";
   static Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
@@ -39,13 +85,11 @@ class WikibaseApi extends EntitySource {
     request.headers.add("From", _responsibleUser);
     final response = await request.close();
 
-    print(await _getUserAgentString());
-
     return await utf8.decoder.bind(response).join();
   }
 
   Future<Map<String, Entity>> _getEntities(Iterable<String> qids, [String params = ""]) async {
-    final json = await _apiGet("https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&ids=${qids.join("%7C")}$params");
+    final json = await _apiGet("$_wikibaseApi?action=wbgetentities&format=json&ids=${qids.join("%7C")}$params");
     final decodedJson = jsonDecode(json);
 
     final Map<String, dynamic> entityMap = decodedJson["entities"] ?? {};
@@ -85,5 +129,18 @@ class WikibaseApi extends EntitySource {
     }
 
     return entity;
+  }
+
+  @override
+  Future<List<SearchResult>> search(String query, int searchLimit) async {
+    SearchResult convertSearchResult(Map<String, dynamic> result) => SearchResult(result["title"], result[r"titlesnippet"], result["snippet"]);
+
+    final encodedQuery = Uri.encodeQueryComponent(query);
+    print("Searching for '$query'");
+    final json = await _apiGet("$_wikibaseApi?action=query&list=search&srsearch=$encodedQuery&srlimit=$searchLimit");
+    final Map<String, dynamic> decodedJson = jsonDecode(json);
+    final Map<String, dynamic> queryResult = decodedJson["query"];
+    final List<Map<String, dynamic>> searchResults = queryResult["search"];
+    return searchResults.map(convertSearchResult).toList();
   }
 }

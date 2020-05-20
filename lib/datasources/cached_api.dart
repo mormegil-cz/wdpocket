@@ -74,6 +74,9 @@ class CachedWikibaseApi extends EntitySource {
   String _getFullCacheKey(String qid) => "full:$qid";
 
   String _getTitleCacheKey(String qid) => "title:$qid";
+
+  @override
+  Future<List<SearchResult>> search(String query, int searchLimit) => _directApi.search(query, searchLimit);
 }
 
 class _EntityCachingAdapter implements CachingAdapter<Entity> {
