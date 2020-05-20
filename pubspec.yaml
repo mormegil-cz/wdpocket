@@ -26,6 +26,7 @@ dependencies:
 
   equatable:
   flutter_bloc:
+  html_unescape:
   package_info:
   path:
   path_provider:

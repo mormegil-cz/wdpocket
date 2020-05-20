@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:html_unescape/html_unescape.dart';
 import 'package:meta/meta.dart';
 import 'package:package_info/package_info.dart';
 
@@ -123,16 +124,35 @@ class WikibaseApi extends EntitySource {
     return entity;
   }
 
+  static List<String> splitTitleSnippet(String snippet) {
+    const String startSpan = r'<span class="searchmatch">';
+    const String endSpan = r'</span>';
+    final int startIndex = snippet.indexOf(startSpan);
+    if (startIndex < 0) {
+      return [snippet];
+    }
+
+    final int startMain = startIndex + startSpan.length;
+    final int endIndex = snippet.indexOf(endSpan, startMain);
+    if (endIndex < 0) {
+      return [snippet.substring(0, startIndex), snippet.substring(startMain)];
+    } else {
+      return [snippet.substring(0, startIndex), snippet.substring(startMain, endIndex), snippet.substring(endIndex + endSpan.length)];
+    }
+  }
+
   @override
   Future<List<SearchResult>> search(String query, int searchLimit) async {
-    SearchResult convertSearchResult(Map<String, dynamic> result) => SearchResult(result["title"], result[r"titlesnippet"], result["snippet"]);
+    final htmlUnescaper = HtmlUnescape();
+    SearchResult convertSearchResult(Map<String, dynamic> result) =>
+        SearchResult(result["title"], splitTitleSnippet(result["titlesnippet"]).map(htmlUnescaper.convert).toList(), result["snippet"]);
 
     final encodedQuery = Uri.encodeQueryComponent(query);
     print("Searching for '$query'");
-    final json = await _apiGet("$_wikibaseApi?action=query&list=search&srsearch=$encodedQuery&srlimit=$searchLimit");
+    final json = await _apiGet("$_wikibaseApi?action=query&format=json&list=search&srsearch=$encodedQuery&srlimit=$searchLimit&srprop=snippet%7Ctitlesnippet&uselang=${languages.first}");
     final Map<String, dynamic> decodedJson = jsonDecode(json);
     final Map<String, dynamic> queryResult = decodedJson["query"];
-    final List<Map<String, dynamic>> searchResults = queryResult["search"];
-    return searchResults.map(convertSearchResult).toList();
+    final List<dynamic> searchResults = queryResult["search"];
+    return searchResults.cast<Map<String, dynamic>>().map(convertSearchResult).toList();
   }
 }

@@ -107,7 +107,7 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
 
   Future<void> _processSearch() async {
     print("Going to search");
-    final String qid = await showSearch(context: context, delegate: EntitySearchDelegate());
+    final String qid = await showSearch(context: context, delegate: EntitySearchDelegate(BlocProvider.of<SearchBloc>(context)));
     if (qid != null) {
       navigateToQid(qid);
     }
@@ -346,6 +346,10 @@ class EntitySiteLinksView extends StatelessWidget {
 }
 
 class EntitySearchDelegate extends SearchDelegate<String> {
+  final SearchBloc _searchBloc;
+
+  EntitySearchDelegate(this._searchBloc);
+
   @override
   List<Widget> buildActions(BuildContext context) => null;
 
@@ -358,22 +362,52 @@ class EntitySearchDelegate extends SearchDelegate<String> {
   @override
   Widget buildSuggestions(BuildContext context) => _buildSearchResults(context);
 
-  Widget _buildSearchResults(BuildContext context) => BlocBuilder<SearchBloc, SearchState>(
-        builder: _buildAsyncBuilder(
-          dataBuilder: (context, List<SearchResult> results) =>
-              ListView.builder(itemCount: results.length, itemBuilder: (context, index) => _buildSearchResult(context, results[index])),
-          errorBuilder: (context, error) => Center(
-              child: Column(children: [
-            Icon(Icons.error),
-            Text(error.toString()),
-          ])),
-          waitingBuilder: (context) => Center(child: CircularProgressIndicator()),
-          emptyBuilder: (context) => Center(child: Icon(Icons.search, size: 70)),
-        ),
-      );
+  Widget _buildSearchResults(BuildContext context) {
+    _searchBloc.add(query);
+
+    return BlocBuilder<SearchBloc, SearchState>(
+      bloc: _searchBloc,
+      builder: _buildAsyncBuilder(
+        dataBuilder: (context, List<SearchResult> results) =>
+            ListView.builder(itemCount: results.length, itemBuilder: (context, index) => _buildSearchResult(context, results[index])),
+        errorBuilder: (context, error) => Center(
+            child: Column(children: [
+          Icon(Icons.error),
+          Text(error.toString()),
+        ])),
+        waitingBuilder: (context) => Center(child: CircularProgressIndicator()),
+        emptyBuilder: (context) => Center(child: Icon(Icons.search, size: 70)),
+      ),
+    );
+  }
 
   Widget _buildSearchResult(BuildContext context, SearchResult result) =>
-      ListTile(title: Text(result.title), subtitle: Text(result.description), onTap: () => close(context, result.qid));
+      ListTile(title: TitleHighlightText(pieces: result.titlePieces), subtitle: Text(result.description ?? ""), onTap: () => close(context, result.qid));
+}
+
+class TitleHighlightText extends StatelessWidget {
+  final List<String> pieces;
+
+  const TitleHighlightText({Key key, @required this.pieces}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final boldStyle = TextStyle(fontWeight: FontWeight.bold);
+    final normalStyle = DefaultTextStyle.of(context).style;
+
+    switch (pieces?.length ?? 0) {
+      case 0:
+        return Text("");
+      case 1:
+        return Text(pieces[0], style: normalStyle);
+      case 2:
+        return RichText(text: TextSpan(text: pieces[0], style: normalStyle, children: [TextSpan(text: pieces[1], style: boldStyle)]));
+      case 3:
+      default:
+        return RichText(
+            text: TextSpan(text: pieces[0], style: normalStyle, children: [TextSpan(text: pieces[1], style: boldStyle), TextSpan(text: pieces[2])]));
+    }
+  }
 }
 
 BlocWidgetBuilder<SearchState> _buildAsyncBuilder({
