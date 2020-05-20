@@ -1,4 +1,4 @@
-name: pocket_data
+name: wd_pocket
 description: GUI app for browsing and editing Wikidata
 
 # The following line prevents the package from being accidentally published to
@@ -24,10 +24,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  equatable:
+  flutter_bloc:
   package_info:
-  sqflite:
-  path_provider:
   path:
+  path_provider:
+  rxdart:
+  sqflite:
   url_launcher:
 
 dev_dependencies:

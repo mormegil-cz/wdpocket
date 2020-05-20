@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_data/models/entity_with_labels.dart';
-import 'package:pocket_data/util.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'blocs/search/search_bloc.dart';
 import 'datasources/api.dart';
 import 'datasources/cached_api.dart';
+import 'models/entity_with_labels.dart';
 import 'models/model.dart';
+import 'models/search_result.dart';
+import 'util.dart';
 
 // TODO: Language localization/configuration
 final List<String> userPreferredLanguages = ["cs", "sk", "en"];
@@ -31,13 +34,15 @@ class WdPocketApp extends StatelessWidget {
         final Object arguments = settings.arguments;
         switch (settings.name) {
           case WdPocketAppHome.routeName:
-            return MaterialPageRoute(builder: (context) => WdPocketAppHome.build(context, arguments));
+            return MaterialPageRoute(builder: (context) => _provideBlocs(WdPocketAppHome.build(context, arguments)));
           case EntityViewScreen.routeName:
-            return MaterialPageRoute(builder: (context) => EntityViewScreen.build(context, arguments));
+            return MaterialPageRoute(builder: (context) => _provideBlocs(EntityViewScreen.build(context, arguments)));
           default:
             throw new UnsupportedError("Route ${settings.name} not supported");
         }
       });
+
+  static Widget _provideBlocs(Widget child) => BlocProvider<SearchBloc>(create: (context) => SearchBloc(entitySource), child: child);
 }
 
 class WdPocketAppHome extends StatelessWidget {
@@ -340,30 +345,6 @@ class EntitySiteLinksView extends StatelessWidget {
   static String _siteLinkUrl(String site, SiteLink link) => wikiSiteBaseUrl(site) + encodePageTitleToUrl(link.pageTitle);
 }
 
-WidgetBuilder _createTextInputDialogBuilder(String caption, String hintText, void onDataEntered(String data)) {
-  return (BuildContext context) {
-    final TextEditingController controller = TextEditingController();
-
-    void onDone() {
-      Navigator.of(context).pop();
-      onDataEntered(controller.text);
-    }
-
-    return AlertDialog(
-      title: Text(caption),
-      content: TextField(controller: controller, decoration: InputDecoration(hintText: hintText), autofocus: true, onSubmitted: (text) => onDone()),
-      actions: <Widget>[
-        new FlatButton(onPressed: onDone, child: Text("OK")),
-        new FlatButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text("Cancel"))
-      ],
-    );
-  };
-}
-
 class EntitySearchDelegate extends SearchDelegate<String> {
   @override
   List<Widget> buildActions(BuildContext context) => null;
@@ -372,38 +353,41 @@ class EntitySearchDelegate extends SearchDelegate<String> {
   Widget buildLeading(BuildContext context) => null;
 
   @override
-  Widget buildResults(BuildContext context) => _buildSearchResults();
+  Widget buildResults(BuildContext context) => _buildSearchResults(context);
 
   @override
-  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+  Widget buildSuggestions(BuildContext context) => _buildSearchResults(context);
 
-  Widget _buildSearchResults() => FutureBuilder(
-      future: _runSearch(query),
-      builder: _buildAsyncBuilder(
+  Widget _buildSearchResults(BuildContext context) => BlocBuilder<SearchBloc, SearchState>(
+        builder: _buildAsyncBuilder(
           dataBuilder: (context, List<SearchResult> results) =>
               ListView.builder(itemCount: results.length, itemBuilder: (context, index) => _buildSearchResult(context, results[index])),
           errorBuilder: (context, error) => Center(
-                  child: Column(children: [
-                Icon(Icons.error),
-                Text(error.toString()),
-              ])),
-          waitingBuilder: (context) => Center(child: CircularProgressIndicator())));
+              child: Column(children: [
+            Icon(Icons.error),
+            Text(error.toString()),
+          ])),
+          waitingBuilder: (context) => Center(child: CircularProgressIndicator()),
+          emptyBuilder: (context) => Center(child: Icon(Icons.search, size: 70)),
+        ),
+      );
 
   Widget _buildSearchResult(BuildContext context, SearchResult result) =>
       ListTile(title: Text(result.title), subtitle: Text(result.description), onTap: () => close(context, result.qid));
-
-  static Future<List<SearchResult>> _runSearch(String query) => query == null || query.isEmpty ? Future.value([]) : entitySource.search(query, 10);
 }
 
-AsyncWidgetBuilder<T> _buildAsyncBuilder<T>({
-  @required Widget dataBuilder(BuildContext context, T snapshotData),
+BlocWidgetBuilder<SearchState> _buildAsyncBuilder({
+  @required Widget dataBuilder(BuildContext context, List<SearchResult> results),
   @required Widget errorBuilder(BuildContext context, Object error),
   @required Widget waitingBuilder(BuildContext context),
+  @required Widget emptyBuilder(BuildContext context),
 }) {
-  Widget asyncBuilder(BuildContext context, AsyncSnapshot<T> snapshot) {
-    if (snapshot.hasData) return dataBuilder(context, snapshot.data);
-    if (snapshot.hasError) return errorBuilder(context, snapshot.error);
-    return waitingBuilder(context);
+  Widget asyncBuilder(BuildContext context, SearchState state) {
+    if (state.isSuccess) return dataBuilder(context, (state as SearchStateSuccess).results);
+    if (state.isError) return errorBuilder(context, (state as SearchStateError).error);
+    if (state.isEmpty) return emptyBuilder(context);
+    if (state.isLoading) return waitingBuilder(context);
+    throw new UnsupportedError("Unknown/unsupported state ${state.runtimeType}");
   }
 
   return asyncBuilder;

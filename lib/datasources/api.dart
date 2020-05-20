@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 import 'package:package_info/package_info.dart';
 
 import '../models/model.dart';
+import '../models/search_result.dart';
 import '../util.dart';
 
 const String wikidataUrlPrefix = "http://www.wikidata.org/entity/";
@@ -50,14 +51,6 @@ abstract class EntitySource {
   Future<List<SearchResult>> search(String query, int searchLimit);
 }
 
-class SearchResult {
-  final String qid;
-  final String title;
-  final String description;
-
-  const SearchResult(this.qid, this.title, this.description);
-}
-
 class WikibaseApi extends EntitySource {
   static const String _wikibaseServer = "https://www.wikidata.org";
   static const String _wikibaseApi = "$_wikibaseServer/w/api.php";
@@ -69,7 +62,6 @@ class WikibaseApi extends EntitySource {
   // TODO: Add Flutter/Dart version?
   static final String _platformInfoString = "(${Platform.operatingSystem}/${Platform.operatingSystemVersion}) (run by <$_responsibleUser>)";
 
-  final Map<String, String> _propertyLabels = {};
   final List<String> languages;
 
   WikibaseApi({@required this.languages});

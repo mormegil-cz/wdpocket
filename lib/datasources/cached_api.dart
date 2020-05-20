@@ -1,12 +1,13 @@
 import 'dart:convert';
 
 import 'package:meta/meta.dart';
-import 'package:pocket_data/datasources/cache.dart';
-import 'package:pocket_data/datasources/sqlite_cache.dart';
-import 'package:pocket_data/models/model.dart';
 
+import '../models/model.dart';
+import '../models/search_result.dart';
 import '../util.dart';
 import 'api.dart';
+import 'cache.dart';
+import 'sqlite_cache.dart';
 
 class CachedWikibaseApi extends EntitySource {
   CachedWikibaseApi({@required List<String> languages})
