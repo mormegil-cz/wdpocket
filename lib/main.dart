@@ -238,18 +238,37 @@ class EntityClaimView extends StatelessWidget {
     ]);
   }
 
-  Widget _buildClaimViewWidget(BuildContext context, Claim claim, TextTheme textTheme) => Card(
-          child: SizedBox(
+  Widget _buildClaimViewWidget(BuildContext context, Claim claim, TextTheme textTheme) {
+    final hasQualifiers = (claim.qualifiers?.length ?? 0) > 0;
+    final hasReferences = (claim.references?.length ?? 0) > 0;
+    final qualifierTheme = textTheme.apply(fontSizeFactor: 0.6);
+    return Card(
+        child: SizedBox(
+            child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ListTile(
+          title: _buildSnakViewWidget(claim.mainSnak, textTheme),
+          subtitle:
+              InkWell(child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property)),
+        ),
+        if (hasQualifiers) Divider(),
+        if (hasQualifiers)
+          Padding(
+              padding: EdgeInsets.only(left: 15),
               child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          ListTile(
-            title: _buildSnakViewWidget(claim.mainSnak, textTheme),
-            subtitle: InkWell(
-                child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property)),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: flatMap(claim.qualifiers.values, (List<Snak> list) => list.map((snak) => _buildSnakViewWidget(snak, qualifierTheme))).toList(),
+              )),
+        if (hasReferences) Divider(),
+        if (hasReferences)
+          Padding(
+            padding: EdgeInsets.only(left: 15),
+            child: Row(children: [Text(claim.references.length.toString()), Icon(Icons.book)]),
           )
-        ],
-      )));
+      ],
+    )));
+  }
 
   Widget _buildSnakViewWidget(Snak snak, TextTheme textTheme) {
     switch (snak.type) {

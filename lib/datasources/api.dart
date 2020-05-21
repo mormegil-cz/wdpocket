@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,13 +17,14 @@ String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring
 String qidToUrl(String qid) => wikidataUrlPrefix + qid;
 
 final Map<String, String> wikiSiteSuffixes = {
-  "wiktionary": "https://@.wikiquote.org",
+  "wiki": "https://@.wikipedia.org",
+  "wiktionary": "https://@.wiktionary.org",
   "wikiquote": "https://@.wikiquote.org",
-  "wikisource": "https://@.wikiquote.org",
-  "wikibooks": "https://@.wikiquote.org",
-  "wikinews": "https://@.wikiquote.org",
-  "wikiversity": "https://@.wikiquote.org",
-  "wikivoyage": "https://@.wikiquote.org",
+  "wikisource": "https://@.wikisource.org",
+  "wikibooks": "https://@.wikibooks.org",
+  "wikinews": "https://@.wikinews.org",
+  "wikiversity": "https://@.wikiversity.org",
+  "wikivoyage": "https://@.wikivoyage.org",
 };
 final Map<String, String> wikiSites = {
   "commonswiki": "https://commons.wikimedia.org",
@@ -149,10 +151,17 @@ class WikibaseApi extends EntitySource {
 
     final encodedQuery = Uri.encodeQueryComponent(query);
     print("Searching for '$query'");
-    final json = await _apiGet("$_wikibaseApi?action=query&format=json&list=search&srsearch=$encodedQuery&srlimit=$searchLimit&srprop=snippet%7Ctitlesnippet&uselang=${languages.first}");
+    final json = await _apiGet(
+        "$_wikibaseApi?action=query&format=json&list=search&srsearch=$encodedQuery&srlimit=$searchLimit&srprop=snippet%7Ctitlesnippet&uselang=${languages.first}");
     final Map<String, dynamic> decodedJson = jsonDecode(json);
     final Map<String, dynamic> queryResult = decodedJson["query"];
     final List<dynamic> searchResults = queryResult["search"];
-    return searchResults.cast<Map<String, dynamic>>().map(convertSearchResult).toList();
+    var result = searchResults.cast<Map<String, dynamic>>().map(convertSearchResult).toList();
+
+    var reEntity = RegExp(r"^[PQ][0-9]+$", caseSensitive: false);
+    if (reEntity.hasMatch(query)) {
+      result.insert(0, SearchResult(query.toUpperCase(), [query], "Entity ID"));
+    }
+    return result;
   }
 }
