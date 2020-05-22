@@ -144,7 +144,12 @@ class EntityView extends StatelessWidget {
   final EntityWithLabels entity;
 
   @override
-  Widget build(BuildContext context) => DefaultTabController(
+  Widget build(BuildContext context) {
+    var statementClaims = _getClaims((dataType) => dataType != "external-id");
+    var identifierClaims = _getClaims((dataType) => dataType == "external-id");
+    var propertyConstraintClaims = _getClaims((dataType) => dataType == "!!TODO: property constraints");
+    var siteLinks = entity.entity.type == EntityType.item ? (entity.entity as Item).siteLinks.entries.toList() : null;
+    return DefaultTabController(
       length: entity.entity.type == EntityType.item ? 4 : 3,
       child: Column(
         children: <Widget>[
@@ -152,28 +157,29 @@ class EntityView extends StatelessWidget {
               decoration: BoxDecoration(color: Theme.of(context).primaryColor),
               child: TabBar(
                 tabs: [
-                  Tab(icon: Icon(Icons.label_outline)),
-                  Tab(icon: Icon(Icons.library_books)),
-                  if (entity.entity.type == EntityType.item) Tab(icon: Icon(Icons.perm_identity)),
-                  if (entity.entity.type == EntityType.property) Tab(icon: Icon(Icons.flag)),
-                  if (entity.entity.type == EntityType.item) Tab(icon: Icon(Icons.link)),
+                  Tab(icon: Icon(Icons.label_outline, semanticLabel: "Labels, descriptions, aliases")),
+                  Tab(icon: IconWithBadge(icon: Icons.library_books, semanticLabel: "Statements", badgeText: statementClaims.length.toString())),
+                  if (entity.entity.type == EntityType.item) Tab(icon: IconWithBadge(icon: Icons.perm_identity, semanticLabel: "Identifiers", badgeText: identifierClaims.length.toString())),
+                  if (entity.entity.type == EntityType.property) Tab(icon: IconWithBadge(icon: Icons.flag, semanticLabel: "Constraints", badgeText: propertyConstraintClaims.length.toString())),
+                  if (entity.entity.type == EntityType.item) Tab(icon: IconWithBadge(icon: Icons.link, semanticLabel: "Site links", badgeText: siteLinks.length.toString())),
                 ],
               )),
           Expanded(
             child: TabBarView(
               children: [
                 EntityLabellingView(entity: entity),
-                EntityClaimView(orderedClaims: _getClaims((dataType) => dataType != "external-id"), labels: entity.labels),
+                EntityClaimView(orderedClaims: statementClaims, labels: entity.labels),
                 if (entity.entity.type == EntityType.item)
-                  EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "external-id"), labels: entity.labels),
+                  EntityClaimView(orderedClaims: identifierClaims, labels: entity.labels),
                 if (entity.entity.type == EntityType.property)
-                  EntityClaimView(orderedClaims: _getClaims((dataType) => dataType == "!!TODO: property constraints"), labels: entity.labels),
-                if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: (entity.entity as Item).siteLinks.entries.toList())
+                  EntityClaimView(orderedClaims: propertyConstraintClaims, labels: entity.labels),
+                if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: siteLinks)
               ],
             ),
           )
         ],
       ));
+  }
 
   List<MapEntry<String, List<Claim>>> _getClaims(bool dataTypeFilter(String dataType)) {
     // TODO: This filters on actual values, it should rather filter on property definitions, since properties with no value snaks appear everywhere right now
@@ -182,6 +188,47 @@ class EntityView extends StatelessWidget {
             .where((claimValue) => claimValue.mainSnak is ValueSnak)
             .every((claimValue) => !dataTypeFilter((claimValue.mainSnak as ValueSnak).dataType)))
         .toList();
+  }
+}
+
+class IconWithBadge extends StatelessWidget {
+  const IconWithBadge({Key key, this.icon, this.semanticLabel, this.badgeText, this.badgeColor = Colors.red, this.badgeTextStyle}) : super(key: key);
+
+  final IconData icon;
+  final String semanticLabel;
+  final String badgeText;
+  final Color badgeColor;
+  final TextStyle badgeTextStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final defaultTextStyle = DefaultTextStyle.of(context).style;
+    return Stack(
+      children: [
+        Icon(icon, semanticLabel: semanticLabel),
+        // TODO: Do we want numbers here? Clean, refactor, keep or drop
+        if (false && badgeText != null)
+          new Positioned(
+            right: 0,
+            child: new Container(
+              padding: EdgeInsets.all(1),
+              decoration: new BoxDecoration(
+                color: badgeColor,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              constraints: BoxConstraints(
+                minWidth: 12,
+                minHeight: 12,
+              ),
+              child: new Text(
+                badgeText,
+                style: badgeTextStyle ?? defaultTextStyle,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+      ],
+    );
   }
 }
 
@@ -242,6 +289,7 @@ class EntityClaimView extends StatelessWidget {
     final hasQualifiers = (claim.qualifiers?.length ?? 0) > 0;
     final hasReferences = (claim.references?.length ?? 0) > 0;
     final qualifierTheme = textTheme.apply(fontSizeFactor: 0.6);
+    final qualifierCaptionTheme = qualifierTheme.apply(decoration: TextDecoration.underline);
     return Card(
         child: SizedBox(
             child: Column(
@@ -258,7 +306,16 @@ class EntityClaimView extends StatelessWidget {
               padding: EdgeInsets.only(left: 15),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: flatMap(claim.qualifiers.values, (List<Snak> list) => list.map((snak) => _buildSnakViewWidget(snak, qualifierTheme))).toList(),
+                children: flatMap(
+                    claim.qualifiers.entries,
+                    (MapEntry<String, List<Snak>> qualifier) => <Widget>[
+                          Text(labels[qualifier.key], style: qualifierTheme.headline5.apply(fontWeightDelta: 4)),
+                          Padding(
+                              padding: EdgeInsets.only(left: 15),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: qualifier.value.map((snak) => _buildSnakViewWidget(snak, qualifierTheme)).toList())),
+                        ]).toList(),
               )),
         if (hasReferences) Divider(),
         if (hasReferences)
