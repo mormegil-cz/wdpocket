@@ -150,35 +150,36 @@ class EntityView extends StatelessWidget {
     var propertyConstraintClaims = _getClaims((dataType) => dataType == "!!TODO: property constraints");
     var siteLinks = entity.entity.type == EntityType.item ? (entity.entity as Item).siteLinks.entries.toList() : null;
     return DefaultTabController(
-      length: entity.entity.type == EntityType.item ? 4 : 3,
-      child: Column(
-        children: <Widget>[
-          Container(
-              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-              child: TabBar(
-                tabs: [
-                  Tab(icon: Icon(Icons.label_outline, semanticLabel: "Labels, descriptions, aliases")),
-                  Tab(icon: IconWithBadge(icon: Icons.library_books, semanticLabel: "Statements", badgeText: statementClaims.length.toString())),
-                  if (entity.entity.type == EntityType.item) Tab(icon: IconWithBadge(icon: Icons.perm_identity, semanticLabel: "Identifiers", badgeText: identifierClaims.length.toString())),
-                  if (entity.entity.type == EntityType.property) Tab(icon: IconWithBadge(icon: Icons.flag, semanticLabel: "Constraints", badgeText: propertyConstraintClaims.length.toString())),
-                  if (entity.entity.type == EntityType.item) Tab(icon: IconWithBadge(icon: Icons.link, semanticLabel: "Site links", badgeText: siteLinks.length.toString())),
+        length: entity.entity.type == EntityType.item ? 4 : 3,
+        child: Column(
+          children: <Widget>[
+            Container(
+                decoration: BoxDecoration(color: Theme.of(context).primaryColor),
+                child: TabBar(
+                  tabs: [
+                    Tab(icon: Icon(Icons.label_outline, semanticLabel: "Labels, descriptions, aliases")),
+                    Tab(icon: IconWithBadge(icon: Icons.library_books, semanticLabel: "Statements", badgeText: statementClaims.length.toString())),
+                    if (entity.entity.type == EntityType.item)
+                      Tab(icon: IconWithBadge(icon: Icons.perm_identity, semanticLabel: "Identifiers", badgeText: identifierClaims.length.toString())),
+                    if (entity.entity.type == EntityType.property)
+                      Tab(icon: IconWithBadge(icon: Icons.flag, semanticLabel: "Constraints", badgeText: propertyConstraintClaims.length.toString())),
+                    if (entity.entity.type == EntityType.item)
+                      Tab(icon: IconWithBadge(icon: Icons.link, semanticLabel: "Site links", badgeText: siteLinks.length.toString())),
+                  ],
+                )),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  EntityLabellingView(entity: entity),
+                  EntityClaimView(orderedClaims: statementClaims, labels: entity.labels),
+                  if (entity.entity.type == EntityType.item) EntityClaimView(orderedClaims: identifierClaims, labels: entity.labels),
+                  if (entity.entity.type == EntityType.property) EntityClaimView(orderedClaims: propertyConstraintClaims, labels: entity.labels),
+                  if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: siteLinks)
                 ],
-              )),
-          Expanded(
-            child: TabBarView(
-              children: [
-                EntityLabellingView(entity: entity),
-                EntityClaimView(orderedClaims: statementClaims, labels: entity.labels),
-                if (entity.entity.type == EntityType.item)
-                  EntityClaimView(orderedClaims: identifierClaims, labels: entity.labels),
-                if (entity.entity.type == EntityType.property)
-                  EntityClaimView(orderedClaims: propertyConstraintClaims, labels: entity.labels),
-                if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: siteLinks)
-              ],
-            ),
-          )
-        ],
-      ));
+              ),
+            )
+          ],
+        ));
   }
 
   List<MapEntry<String, List<Claim>>> _getClaims(bool dataTypeFilter(String dataType)) {
@@ -289,43 +290,57 @@ class EntityClaimView extends StatelessWidget {
     final hasQualifiers = (claim.qualifiers?.length ?? 0) > 0;
     final hasReferences = (claim.references?.length ?? 0) > 0;
     final qualifierTheme = textTheme.apply(fontSizeFactor: 0.6);
-    final qualifierCaptionTheme = qualifierTheme.apply(decoration: TextDecoration.underline);
+    final qualifierCaptionStyle = qualifierTheme.headline5.apply(fontWeightDelta: 4);
     return Card(
-        child: SizedBox(
-            child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        ListTile(
-          title: _buildSnakViewWidget(claim.mainSnak, textTheme),
-          subtitle:
-              InkWell(child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property)),
-        ),
-        if (hasQualifiers) Divider(),
-        if (hasQualifiers)
-          Padding(
-              padding: EdgeInsets.only(left: 15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: flatMap(
-                    claim.qualifiers.entries,
-                    (MapEntry<String, List<Snak>> qualifier) => <Widget>[
-                          Text(labels[qualifier.key], style: qualifierTheme.headline5.apply(fontWeightDelta: 4)),
-                          Padding(
-                              padding: EdgeInsets.only(left: 15),
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: qualifier.value.map((snak) => _buildSnakViewWidget(snak, qualifierTheme)).toList())),
-                        ]).toList(),
-              )),
-        if (hasReferences) Divider(),
-        if (hasReferences)
-          Padding(
-            padding: EdgeInsets.only(left: 15),
-            child: Row(children: [Text(claim.references.length.toString()), Icon(Icons.book)]),
-          )
-      ],
-    )));
+        child: Padding(
+            padding: EdgeInsets.all(5),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+              Row(children: [
+                InkWell(child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property))
+              ]),
+              _buildSnakViewWidget(claim.mainSnak, textTheme),
+              if (hasQualifiers)
+                Divider(),
+              if (hasQualifiers)
+                Padding(
+                    padding: EdgeInsets.only(left: 15),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: flatMap(
+                          claim.qualifiers.entries,
+                          (MapEntry<String, List<Snak>> qualifier) => <Widget>[
+                                Text(labels[qualifier.key], style: qualifierCaptionStyle),
+                                Padding(
+                                    padding: EdgeInsets.only(left: 15),
+                                    child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: qualifier.value.map((snak) => _buildSnakViewWidget(snak, qualifierTheme)).toList())),
+                              ]).toList(),
+                    )),
+              //if (hasReferences) ...claim.references.map((ref) => _buildReferenceViewWidget(ref, qualifierTheme)),
+              if (hasReferences)
+                Divider(),
+              if (hasReferences)
+                Padding(
+                  padding: EdgeInsets.only(left: 15),
+                  child: Row(children: [Text(claim.references.length.toString()), Icon(Icons.book)]),
+                )
+            ])));
   }
+
+  Widget _buildReferenceViewWidget(Reference reference, TextTheme textTheme) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+        Divider(),
+        ...flatMap(
+            reference.snaks.entries,
+            (MapEntry<String, List<Snak>> qualifier) => <Widget>[
+                  Text(labels[qualifier.key], style: textTheme.headline5),
+                  Padding(
+                      padding: EdgeInsets.only(left: 15),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: qualifier.value.map((snak) => _buildSnakViewWidget(snak, textTheme)).toList())),
+                ]).toList(),
+      ]);
 
   Widget _buildSnakViewWidget(Snak snak, TextTheme textTheme) {
     switch (snak.type) {
