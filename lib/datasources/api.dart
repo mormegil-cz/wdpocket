@@ -1,10 +1,8 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:html_unescape/html_unescape.dart';
-import 'package:meta/meta.dart';
-import 'package:package_info/package_info.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../models/model.dart';
 import '../models/search_result.dart';
@@ -12,7 +10,7 @@ import '../util.dart';
 
 const String wikidataUrlPrefix = "http://www.wikidata.org/entity/";
 
-String urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring(wikidataUrlPrefix.length) : null;
+String? urlToQid(String url) => url.startsWith(wikidataUrlPrefix) ? url.substring(wikidataUrlPrefix.length) : null;
 
 String qidToUrl(String qid) => wikidataUrlPrefix + qid;
 
@@ -34,7 +32,7 @@ final Map<String, String> wikiSites = {
 };
 
 String wikiSiteBaseUrl(String siteId) {
-  final String directWikiSite = wikiSites[siteId];
+  final String? directWikiSite = wikiSites[siteId];
   if (directWikiSite != null) return "$directWikiSite/wiki/";
   for (final MapEntry<String, String> wikiSite in wikiSiteSuffixes.entries) {
     if (siteId.endsWith(wikiSite.key)) return wikiSite.value.replaceFirst("@", siteId.substring(0, siteId.length - wikiSite.key.length)) + "/wiki/";
@@ -49,7 +47,7 @@ abstract class EntitySource {
 
   Future<Map<String, String>> getEntityLabels(Iterable<String> ids);
 
-  Future<String> getPropertyLabel(String id) async => (await getEntityLabels([id]))[id];
+  Future<String?> getPropertyLabel(String id) async => (await getEntityLabels([id]))[id];
 
   Future<List<SearchResult>> search(String query, int searchLimit);
 }
@@ -67,7 +65,7 @@ class WikibaseApi extends EntitySource {
 
   final List<String> languages;
 
-  WikibaseApi({@required this.languages});
+  WikibaseApi({required this.languages});
 
   Future<String> _getUserAgentString() async {
     final info = await _packageInfo;

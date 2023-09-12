@@ -18,7 +18,7 @@ Iterable<List<T>> split<T>(Iterable<T> collection, int maxSize) sync* {
   }
 }
 
-String getLocalizedLabel(Map<String, String> localizations, Iterable<String> languages) =>
+String? getLocalizedLabel(Map<String, String> localizations, Iterable<String> languages) =>
     languages.map((language) => localizations[language]).firstWhere((element) => element != null && element.isNotEmpty, orElse: () => null);
 
 Comparator<T> comparerByPreferredList<T>(List<T> preferredList, Comparator<T> baseComparator) {

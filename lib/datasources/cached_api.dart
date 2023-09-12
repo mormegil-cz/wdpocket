@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:meta/meta.dart';
-
 import '../models/model.dart';
 import '../models/search_result.dart';
 import '../util.dart';
@@ -10,7 +8,7 @@ import 'cache.dart';
 import 'sqlite_cache.dart';
 
 class CachedWikibaseApi extends EntitySource {
-  CachedWikibaseApi({@required List<String> languages})
+  CachedWikibaseApi({required List<String> languages})
       : _languages = languages,
         _directApi = WikibaseApi(languages: languages);
 
@@ -44,13 +42,14 @@ class CachedWikibaseApi extends EntitySource {
       final cachedTitle = await _cache.find(_stringCachingAdapter, _getTitleCacheKey(id));
       if (cachedTitle == null) {
         // not in title cache, try to find the full entity
-        final Entity cachedEntity = await _cache.find(_entityCachingAdapter, _getFullCacheKey(id));
+        final Entity? cachedEntity = await _cache.find(_entityCachingAdapter, _getFullCacheKey(id));
         if (cachedEntity == null) {
           // not in the full cache either, we’ll need to load it
           idsToLoad.add(id);
         } else {
           // full entity cached, retrieve a label
-          result[id] = getLocalizedLabel(cachedEntity.labels, _languages);
+          var localizedLabel = getLocalizedLabel(cachedEntity.labels, _languages);
+          if (localizedLabel != null) result[id] = localizedLabel;
         }
       } else {
         // title cached

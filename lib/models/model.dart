@@ -1,13 +1,14 @@
 import 'dart:collection';
 
-import 'package:meta/meta.dart';
-
 import '../datasources/api.dart';
 import '../util.dart';
 
 enum EntityType { item, property }
+
 enum ClaimRank { deprecated, normal, preferred }
+
 enum SnakType { value, someValue, noValue }
+
 enum ValueType { string, entityId, coordinate, quantity, time, monolingualText }
 
 abstract class _EntityEnumerable {
@@ -33,8 +34,8 @@ abstract class Entity implements _EntityEnumerable, _JsonSerializable {
   }
 
   String qid;
-  DateTime modified;
-  String lastRevId;
+  DateTime? modified;
+  String? lastRevId;
 
   Map<String, String> labels;
   Map<String, String> descriptions;
@@ -52,14 +53,14 @@ abstract class Entity implements _EntityEnumerable, _JsonSerializable {
 
 class Item extends Entity {
   Item(
-      {@required String qid,
-      @required Map<String, String> labels,
-      @required Map<String, String> descriptions,
-      @required Map<String, List<String>> aliases,
-      @required Map<String, List<Claim>> claims,
-      @required this.siteLinks,
-      DateTime modified,
-      String lastRevId})
+      {required String qid,
+      required Map<String, String> labels,
+      required Map<String, String> descriptions,
+      required Map<String, List<String>> aliases,
+      required Map<String, List<Claim>> claims,
+      required this.siteLinks,
+      DateTime? modified,
+      String? lastRevId})
       : super(qid, modified, lastRevId, labels, descriptions, aliases, claims);
 
   factory Item.fromParsedJson(Map<String, dynamic> json) => Item(
@@ -89,13 +90,13 @@ class Item extends Entity {
 
 class Property extends Entity {
   Property(
-      {@required String qid,
-      @required Map<String, String> labels,
-      @required Map<String, String> descriptions,
-      @required Map<String, List<String>> aliases,
-      @required Map<String, List<Claim>> claims,
-      DateTime modified,
-      String lastRevId})
+      {required String qid,
+      required Map<String, String> labels,
+      required Map<String, String> descriptions,
+      required Map<String, List<String>> aliases,
+      required Map<String, List<Claim>> claims,
+      DateTime? modified,
+      String? lastRevId})
       : super(qid, modified, lastRevId, labels, descriptions, aliases, claims);
 
   factory Property.fromParsedJson(Map<String, dynamic> json) => Property(
@@ -120,7 +121,7 @@ class Property extends Entity {
 }
 
 class Claim implements _EntityEnumerable, _JsonSerializable {
-  Claim({@required this.id, @required this.rank, @required this.mainSnak, @required this.qualifiers, @required this.references});
+  Claim({required this.id, required this.rank, required this.mainSnak, required this.qualifiers, required this.references});
 
   factory Claim.fromParsedJson(Map<String, dynamic> json) => Claim(
         id: json["id"],
@@ -148,7 +149,7 @@ class Claim implements _EntityEnumerable, _JsonSerializable {
   Map<String, dynamic> toJsonStructure() => {
         "id": id,
         "rank": _rankToJson(rank),
-        r"mainsnak": mainSnak?.toJsonStructure(),
+        r"mainsnak": mainSnak.toJsonStructure(),
         "qualifiers": _mapOfListsToJson(qualifiers),
         "qualifiers-order": qualifiers.keys.toList(),
         "references": _listToJson(references),
@@ -156,7 +157,7 @@ class Claim implements _EntityEnumerable, _JsonSerializable {
 }
 
 class Reference implements _EntityEnumerable, _JsonSerializable {
-  Reference({this.hash, this.snaks});
+  Reference({required this.hash, required this.snaks});
 
   factory Reference.fromParsedJson(Map<String, dynamic> json) =>
       Reference(hash: json["hash"], snaks: _snaksTableFromJson(json[r"snaks"], json[r"snaks-order"]));
@@ -177,7 +178,7 @@ class Reference implements _EntityEnumerable, _JsonSerializable {
 }
 
 abstract class Snak implements _EntityEnumerable, _JsonSerializable {
-  Snak({@required this.property, @required this.hash});
+  Snak({required this.property, required this.hash});
 
   factory Snak.fromParsedJson(Map<String, dynamic> json) {
     switch (json[r"snaktype"]) {
@@ -202,7 +203,7 @@ abstract class Snak implements _EntityEnumerable, _JsonSerializable {
 }
 
 class ValueSnak extends Snak {
-  ValueSnak({@required String property, @required String hash, @required this.dataType, @required this.value}) : super(property: property, hash: hash);
+  ValueSnak({required String property, required String hash, required this.dataType, required this.value}) : super(property: property, hash: hash);
 
   factory ValueSnak.fromParsedJson(Map<String, dynamic> json) =>
       ValueSnak(property: json["property"], hash: json["hash"], dataType: json[r"datatype"], value: DataValue.fromParsedJson(json[r"datavalue"]));
@@ -229,7 +230,7 @@ class ValueSnak extends Snak {
 }
 
 class SomeValueSnak extends Snak {
-  SomeValueSnak({@required String property, @required String hash}) : super(property: property, hash: hash);
+  SomeValueSnak({required String property, required String hash}) : super(property: property, hash: hash);
 
   factory SomeValueSnak.fromParsedJson(Map<String, dynamic> json) => SomeValueSnak(property: json["property"], hash: json["hash"]);
 
@@ -247,7 +248,7 @@ class SomeValueSnak extends Snak {
 }
 
 class NoValueSnak extends Snak {
-  NoValueSnak({@required String property, @required String hash}) : super(property: property, hash: hash);
+  NoValueSnak({required String property, required String hash}) : super(property: property, hash: hash);
 
   factory NoValueSnak.fromParsedJson(Map<String, dynamic> json) => NoValueSnak(property: json["property"], hash: json["hash"]);
 
@@ -265,7 +266,7 @@ class NoValueSnak extends Snak {
 }
 
 class SiteLink implements _JsonSerializable {
-  SiteLink({@required this.pageTitle, List<String> badges}) : this.badges = badges ?? [];
+  SiteLink({required this.pageTitle, List<String>? badges}) : this.badges = badges ?? [];
 
   factory SiteLink.fromParsedJson(Map<String, dynamic> json) => SiteLink(pageTitle: json["title"], badges: _stringListFromJson(json["badges"]));
 
@@ -354,7 +355,7 @@ class EntityIdValue extends DataValue {
 }
 
 class MonolingualText extends DataValue {
-  MonolingualText({@required this.text, @required this.language});
+  MonolingualText({required this.text, required this.language});
 
   factory MonolingualText.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> value = json["value"];
@@ -380,7 +381,7 @@ class MonolingualText extends DataValue {
 }
 
 class TimeValue extends DataValue {
-  TimeValue({@required this.time, @required this.precision, @required this.calendarModel});
+  TimeValue({required this.time, required this.precision, required this.calendarModel});
 
   factory TimeValue.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> value = json["value"];
@@ -411,7 +412,7 @@ class TimeValue extends DataValue {
 }
 
 class QuantityValue extends DataValue {
-  QuantityValue({@required this.amount, @required this.upperBound, @required this.lowerBound, @required this.unit});
+  QuantityValue({required this.amount, required this.upperBound, required this.lowerBound, required this.unit});
 
   factory QuantityValue.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> value = json["value"];
@@ -421,8 +422,8 @@ class QuantityValue extends DataValue {
   get type => ValueType.quantity;
 
   String amount;
-  String upperBound;
-  String lowerBound;
+  String? upperBound;
+  String? lowerBound;
   String unit;
 
   @override
@@ -444,7 +445,7 @@ class QuantityValue extends DataValue {
 }
 
 class CoordinateValue extends DataValue {
-  CoordinateValue({@required this.latitude, @required this.longitude, @required this.precision, @required this.globe});
+  CoordinateValue({required this.latitude, required this.longitude, required this.precision, required this.globe});
 
   factory CoordinateValue.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> value = json["value"];
@@ -477,30 +478,30 @@ class CoordinateValue extends DataValue {
   String toString() => "$latitude, $longitude /$precision";
 }
 
-Map<String, String> _multiLanguageStringsFromJson(Map<String, dynamic> json) => json?.map((key, value) => MapEntry<String, String>(key, value["value"]));
+Map<String, String> _multiLanguageStringsFromJson(Map<String, dynamic>? json) => json?.map((key, value) => MapEntry<String, String>(key, value["value"])) ?? {};
 
-Map<String, dynamic> _multiLanguageStringsToJson(Map<String, String> data) =>
-    data?.map((key, value) => MapEntry<String, dynamic>(key, {"language": key, "value": value}));
+Map<String, dynamic> _multiLanguageStringsToJson(Map<String, String>? data) =>
+    data?.map((key, value) => MapEntry<String, dynamic>(key, {"language": key, "value": value})) ?? {};
 
-Map<String, List<String>> _aliasesFromJson(Map<String, dynamic> aliasesJson) => aliasesJson
-    ?.map((language, aliasList) => MapEntry<String, List<String>>(language, (aliasList as List<dynamic>).map((alias) => alias["value"] as String).toList()));
+Map<String, List<String>> _aliasesFromJson(Map<String, dynamic>? aliasesJson) => aliasesJson
+    ?.map((language, aliasList) => MapEntry<String, List<String>>(language, (aliasList as List<dynamic>).map((alias) => alias["value"] as String).toList())) ?? {};
 
-Map<String, dynamic> _aliasesToJson(Map<String, List<String>> aliases) =>
-    aliases?.map((language, aliasList) => MapEntry<String, dynamic>(language, aliasList.map((alias) => {"language": language, "value": alias}).toList()));
+Map<String, dynamic> _aliasesToJson(Map<String, List<String>>? aliases) =>
+    aliases?.map((language, aliasList) => MapEntry<String, dynamic>(language, aliasList.map((alias) => {"language": language, "value": alias}).toList())) ?? {};
 
-Map<String, List<Claim>> _claimsFromJson(Map<String, dynamic> claimsJson) => claimsJson
-    ?.map((property, claims) => MapEntry<String, List<Claim>>(property, (claims as List<dynamic>).map((json) => Claim.fromParsedJson(json)).toList()));
+Map<String, List<Claim>> _claimsFromJson(Map<String, dynamic>? claimsJson) => claimsJson
+    ?.map((property, claims) => MapEntry<String, List<Claim>>(property, (claims as List<dynamic>).map((json) => Claim.fromParsedJson(json)).toList())) ?? {};
 
-Map<String, SiteLink> _siteLinksFromJson(Map<String, dynamic> siteLinksJson) =>
-    siteLinksJson?.map((site, link) => MapEntry<String, SiteLink>(site, SiteLink.fromParsedJson(link)));
+Map<String, SiteLink> _siteLinksFromJson(Map<String, dynamic>? siteLinksJson) =>
+    siteLinksJson?.map((site, link) => MapEntry<String, SiteLink>(site, SiteLink.fromParsedJson(link))) ?? {};
 
-List<Map<String, dynamic>> _listToJson<T extends _JsonSerializable>(List<T> list) => list?.map((value) => value.toJsonStructure())?.toList();
+List<Map<String, dynamic>> _listToJson<T extends _JsonSerializable>(List<T>? list) => list?.map((value) => value.toJsonStructure()).toList() ?? [];
 
-Map<String, dynamic> _mapToJson<T extends _JsonSerializable>(Map<String, T> map) =>
-    map?.map((key, value) => MapEntry<String, dynamic>(key, value.toJsonStructure()));
+Map<String, dynamic> _mapToJson<T extends _JsonSerializable>(Map<String, T>? map) =>
+    map?.map((key, value) => MapEntry<String, dynamic>(key, value.toJsonStructure())) ?? {};
 
-Map<String, dynamic> _mapOfListsToJson<T extends _JsonSerializable>(Map<String, List<T>> map) =>
-    map?.map((key, value) => MapEntry<String, dynamic>(key, value.map((item) => item.toJsonStructure()).toList()));
+Map<String, dynamic> _mapOfListsToJson<T extends _JsonSerializable>(Map<String, List<T>>? map) =>
+    map?.map((key, value) => MapEntry<String, dynamic>(key, value.map((item) => item.toJsonStructure()).toList())) ?? {};
 
 ClaimRank _rankFromJson(String rank) {
   switch (rank) {
@@ -547,13 +548,13 @@ ValueType _valueTypeFromJson(String type) {
   }
 }
 
-LinkedHashMap<String, List<Snak>> _snaksTableFromJson(Map<String, dynamic> snaksJson, List<dynamic> snaksOrder) => snaksJson == null || snaksOrder == null
+LinkedHashMap<String, List<Snak>> _snaksTableFromJson(Map<String, dynamic>? snaksJson, List<dynamic>? snaksOrder) => snaksJson == null || snaksOrder == null
     ? LinkedHashMap()
     : LinkedHashMap.fromEntries(snaksOrder.map((property) => MapEntry(property, _snakListFromJson(snaksJson[property]))));
 
 List<Snak> _snakListFromJson(List<dynamic> json) => json.map((snak) => Snak.fromParsedJson(snak)).toList();
 
-List<Reference> _referencesFromJson(List<dynamic> json) => json == null ? [] : json.map((reference) => Reference.fromParsedJson(reference)).toList();
+List<Reference> _referencesFromJson(List<dynamic>? json) => json == null ? [] : json.map((reference) => Reference.fromParsedJson(reference)).toList();
 
 List<String> _stringListFromJson(List<dynamic> json) => json.cast<String>().toList();
 
@@ -561,6 +562,6 @@ Set<String> _collectAllPropertiesUsed(Iterable<_EntityEnumerable> collection) =>
     collection.fold(Set<String>(), (currSet, item) => currSet.union(item.collectAllReferredEntities()));
 
 Set<String> _urlToQidSet(String url) {
-  final String qid = urlToQid(url);
+  final String? qid = urlToQid(url);
   return qid == null ? {} : {qid};
 }

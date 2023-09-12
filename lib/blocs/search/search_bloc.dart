@@ -6,12 +6,9 @@ import '../../datasources/api.dart';
 import '../../models/search_result.dart';
 
 class SearchBloc extends Bloc<String, SearchState> {
-  SearchBloc(this._entitySource);
+  SearchBloc(this._entitySource) : super(SearchStateEmpty());
 
   final EntitySource _entitySource;
-
-  @override
-  SearchState get initialState => SearchStateEmpty();
 
   @override
   Stream<Transition<String, SearchState>> transformEvents(

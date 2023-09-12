@@ -4,7 +4,7 @@ abstract class CachingAdapter<T> {
 }
 
 abstract class Cache {
-  Future<T> find<T>(CachingAdapter<T> adapter, String key);
+  Future<T?> find<T>(CachingAdapter<T> adapter, String key);
   Future<void> store<T>(CachingAdapter<T> adapter, String key, T value);
 }
 
@@ -12,7 +12,7 @@ class DictionaryCache extends Cache {
   final Map<String, String> _store = {};
 
   @override
-  Future<T> find<T>(CachingAdapter<T> adapter, String key) async {
+  Future<T?> find<T>(CachingAdapter<T> adapter, String key) async {
     var stored = _store[key];
     if (stored == null) return null;
 

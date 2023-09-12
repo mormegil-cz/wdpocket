@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import 'blocs/search/search_bloc.dart';
 import 'datasources/api.dart';
@@ -31,12 +31,12 @@ class WdPocketApp extends StatelessWidget {
       ),
       initialRoute: WdPocketAppHome.routeName,
       onGenerateRoute: (settings) {
-        final Object arguments = settings.arguments;
+        final Object? arguments = settings.arguments;
         switch (settings.name) {
           case WdPocketAppHome.routeName:
             return MaterialPageRoute(builder: (context) => _provideBlocs(WdPocketAppHome.build(context, arguments)));
           case EntityViewScreen.routeName:
-            return MaterialPageRoute(builder: (context) => _provideBlocs(EntityViewScreen.build(context, arguments)));
+            return MaterialPageRoute(builder: (context) => _provideBlocs(EntityViewScreen.build(context, arguments as String)));
           default:
             throw new UnsupportedError("Route ${settings.name} not supported");
         }
@@ -50,7 +50,7 @@ class WdPocketAppHome extends StatelessWidget {
 
   WdPocketAppHome();
 
-  WdPocketAppHome.build(BuildContext context, Object arguments) : this();
+  WdPocketAppHome.build(BuildContext context, Object? arguments) : this();
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -60,16 +60,16 @@ class WdPocketAppHome extends StatelessWidget {
       body: Center(child: IconButton(icon: Icon(Icons.home), iconSize: 70, onPressed: () => _navigateToQid(context, "Q42"))));
 }
 
-Future<Object> _navigateToQid(BuildContext context, String qid) => Navigator.pushNamed(context, EntityViewScreen.routeName, arguments: qid);
+Future<Object?> _navigateToQid(BuildContext context, String qid) => Navigator.pushNamed(context, EntityViewScreen.routeName, arguments: qid);
 
 mixin _QidNavigationOnState<T extends StatefulWidget> on State<T> {
-  Future<Object> navigateToQid(String qid) => _navigateToQid(this.context, qid);
+  Future<Object?> navigateToQid(String qid) => _navigateToQid(this.context, qid);
 }
 
 class EntityViewScreen extends StatefulWidget {
   static const routeName = '/item';
 
-  const EntityViewScreen({Key key, this.qid}) : super(key: key);
+  const EntityViewScreen({Key? key, required this.qid}) : super(key: key);
 
   EntityViewScreen.build(BuildContext context, String arguments) : this(qid: arguments);
 
@@ -85,7 +85,7 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
   EntityViewScreenState(this.qid);
 
   final String qid;
-  Future<EntityWithLabels> _data;
+  Future<EntityWithLabels>? _data;
 
   @override
   void initState() {
@@ -107,7 +107,7 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
 
   Future<void> _processSearch() async {
     print("Going to search");
-    final String qid = await showSearch(context: context, delegate: EntitySearchDelegate(BlocProvider.of<SearchBloc>(context)));
+    final String? qid = await showSearch(context: context, delegate: EntitySearchDelegate(BlocProvider.of<SearchBloc>(context)));
     if (qid != null) {
       navigateToQid(qid);
     }
@@ -119,17 +119,17 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
         title: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureTitleBuilder),
         actions: <Widget>[
           IconButton(icon: Icon(Icons.search), onPressed: _processSearch),
-          IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launch(qidToUrl(qid)))
+          IconButton(icon: Icon(Icons.open_in_browser), onPressed: () => launchUrlString(qidToUrl(qid)))
         ],
       ),
       body: FutureBuilder<EntityWithLabels>(future: _data, builder: _futureEntityViewBuilder));
 
   Widget _futureTitleBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) =>
-      snapshot.hasData ? Text("$qid: ${snapshot.data.labels[qid]}") : Text(qid);
+      snapshot.hasData ? Text("$qid: ${snapshot.data!.labels[qid]}") : Text(qid);
 
   static Widget _futureEntityViewBuilder(BuildContext context, AsyncSnapshot<EntityWithLabels> snapshot) {
     if (snapshot.hasData) {
-      return EntityView(key: ValueKey(snapshot.data.entity.qid), entity: snapshot.data);
+      return EntityView(key: ValueKey(snapshot.data!.entity.qid), entity: snapshot.data!);
     }
     if (snapshot.hasError) {
       return Center(child: Column(children: [Icon(Icons.error, size: 100), Text(snapshot.error.toString())]));
@@ -139,7 +139,7 @@ class EntityViewScreenState extends State<EntityViewScreen> with _QidNavigationO
 }
 
 class EntityView extends StatelessWidget {
-  EntityView({@required this.entity, Key key}) : super(key: key);
+  EntityView({required this.entity, Key? key}) : super(key: key);
 
   final EntityWithLabels entity;
 
@@ -164,7 +164,7 @@ class EntityView extends StatelessWidget {
                     if (entity.entity.type == EntityType.property)
                       Tab(icon: IconWithBadge(icon: Icons.flag, semanticLabel: "Constraints", badgeText: propertyConstraintClaims.length.toString())),
                     if (entity.entity.type == EntityType.item)
-                      Tab(icon: IconWithBadge(icon: Icons.link, semanticLabel: "Site links", badgeText: siteLinks.length.toString())),
+                      Tab(icon: IconWithBadge(icon: Icons.link, semanticLabel: "Site links", badgeText: siteLinks!.length.toString())),
                   ],
                 )),
             Expanded(
@@ -174,7 +174,7 @@ class EntityView extends StatelessWidget {
                   EntityClaimView(orderedClaims: statementClaims, labels: entity.labels),
                   if (entity.entity.type == EntityType.item) EntityClaimView(orderedClaims: identifierClaims, labels: entity.labels),
                   if (entity.entity.type == EntityType.property) EntityClaimView(orderedClaims: propertyConstraintClaims, labels: entity.labels),
-                  if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: siteLinks)
+                  if (entity.entity.type == EntityType.item) EntitySiteLinksView(orderedLinks: siteLinks!)
                 ],
               ),
             )
@@ -193,13 +193,14 @@ class EntityView extends StatelessWidget {
 }
 
 class IconWithBadge extends StatelessWidget {
-  const IconWithBadge({Key key, this.icon, this.semanticLabel, this.badgeText, this.badgeColor = Colors.red, this.badgeTextStyle}) : super(key: key);
+  const IconWithBadge({Key? key, required this.icon, required this.semanticLabel, this.badgeText, this.badgeColor = Colors.red, this.badgeTextStyle})
+      : super(key: key);
 
   final IconData icon;
   final String semanticLabel;
-  final String badgeText;
+  final String? badgeText;
   final Color badgeColor;
-  final TextStyle badgeTextStyle;
+  final TextStyle? badgeTextStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +223,7 @@ class IconWithBadge extends StatelessWidget {
                 minHeight: 12,
               ),
               child: new Text(
-                badgeText,
+                badgeText!,
                 style: badgeTextStyle ?? defaultTextStyle,
                 textAlign: TextAlign.center,
               ),
@@ -234,7 +235,7 @@ class IconWithBadge extends StatelessWidget {
 }
 
 class EntityLabellingView extends StatelessWidget {
-  EntityLabellingView({@required EntityWithLabels entity, Key key})
+  EntityLabellingView({required EntityWithLabels entity, Key? key})
       : this.data = entity,
         super(key: key);
 
@@ -254,8 +255,8 @@ class EntityLabellingView extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ListTile(
         leading: CircleAvatar(child: Text(language)),
-        title: Text(data.entity.labels[language] ?? "", style: textTheme.bodyText1),
-        subtitle: Text(data.entity.descriptions[language] ?? "", style: textTheme.bodyText2),
+        title: Text(data.entity.labels[language] ?? "", style: textTheme.bodyLarge),
+        subtitle: Text(data.entity.descriptions[language] ?? "", style: textTheme.bodyLarge),
       ),
       Wrap(children: (data.entity.aliases[language]?.map((alias) => Chip(label: Text(alias))) ?? []).toList()),
     ]));
@@ -263,7 +264,7 @@ class EntityLabellingView extends StatelessWidget {
 }
 
 class EntityClaimView extends StatelessWidget {
-  const EntityClaimView({@required this.orderedClaims, @required this.labels, Key key}) : super(key: key);
+  const EntityClaimView({required this.orderedClaims, required this.labels, Key? key}) : super(key: key);
 
   final List<MapEntry<String, List<Claim>>> orderedClaims;
   final Map<String, String> labels;
@@ -281,26 +282,27 @@ class EntityClaimView extends StatelessWidget {
     final List<Widget> claimWidgets = claims.map((claim) => _buildClaimViewWidget(context, claim, textTheme)).toList(growable: false);
 
     return Column(children: <Widget>[
-      Text(labels[propertyId], style: textTheme.headline5),
+      Text(labels[propertyId] ?? propertyId, style: textTheme.headlineSmall),
       Container(padding: EdgeInsets.only(left: 5), child: Column(children: claimWidgets))
     ]);
   }
 
   Widget _buildClaimViewWidget(BuildContext context, Claim claim, TextTheme textTheme) {
-    final hasQualifiers = (claim.qualifiers?.length ?? 0) > 0;
-    final hasReferences = (claim.references?.length ?? 0) > 0;
+    final hasQualifiers = claim.qualifiers.length > 0;
+    final hasReferences = claim.references.length > 0;
     final qualifierTheme = textTheme.apply(fontSizeFactor: 0.6);
-    final qualifierCaptionStyle = qualifierTheme.headline5.apply(fontWeightDelta: 4);
+    final qualifierCaptionStyle = qualifierTheme.headlineSmall?.apply(fontWeightDelta: 4);
     return Card(
         child: Padding(
             padding: EdgeInsets.all(5),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
               Row(children: [
-                InkWell(child: Text(labels[claim.mainSnak.property], style: textTheme.subtitle2), onTap: () => _navigateToQid(context, claim.mainSnak.property))
+                InkWell(
+                    child: Text(labels[claim.mainSnak.property] ?? claim.mainSnak.property, style: textTheme.titleSmall),
+                    onTap: () => _navigateToQid(context, claim.mainSnak.property))
               ]),
               _buildSnakViewWidget(claim.mainSnak, textTheme),
-              if (hasQualifiers)
-                Divider(),
+              if (hasQualifiers) Divider(),
               if (hasQualifiers)
                 Padding(
                     padding: EdgeInsets.only(left: 15),
@@ -309,7 +311,7 @@ class EntityClaimView extends StatelessWidget {
                       children: flatMap(
                           claim.qualifiers.entries,
                           (MapEntry<String, List<Snak>> qualifier) => <Widget>[
-                                Text(labels[qualifier.key], style: qualifierCaptionStyle),
+                                Text(labels[qualifier.key] ?? qualifier.key, style: qualifierCaptionStyle),
                                 Padding(
                                     padding: EdgeInsets.only(left: 15),
                                     child: Column(
@@ -318,8 +320,7 @@ class EntityClaimView extends StatelessWidget {
                               ]).toList(),
                     )),
               //if (hasReferences) ...claim.references.map((ref) => _buildReferenceViewWidget(ref, qualifierTheme)),
-              if (hasReferences)
-                Divider(),
+              if (hasReferences) Divider(),
               if (hasReferences)
                 Padding(
                   padding: EdgeInsets.only(left: 15),
@@ -333,7 +334,7 @@ class EntityClaimView extends StatelessWidget {
         ...flatMap(
             reference.snaks.entries,
             (MapEntry<String, List<Snak>> qualifier) => <Widget>[
-                  Text(labels[qualifier.key], style: textTheme.headline5),
+                  Text(labels[qualifier.key] ?? qualifier.key, style: textTheme.headlineSmall),
                   Padding(
                       padding: EdgeInsets.only(left: 15),
                       child: Column(
@@ -349,7 +350,7 @@ class EntityClaimView extends StatelessWidget {
       case SnakType.someValue:
         return Icon(Icons.device_unknown);
       case SnakType.value:
-        final ValueSnak valueSnak = snak;
+        final ValueSnak valueSnak = snak as ValueSnak;
         return _buildDataValueViewWidget(valueSnak.value, textTheme);
       default:
         throw new UnsupportedError("Unsupported snak type");
@@ -361,13 +362,13 @@ class EntityClaimView extends StatelessWidget {
       case ValueType.string:
       case ValueType.coordinate:
       case ValueType.time:
-        return Text(value.toString(), style: textTheme.headline5);
+        return Text(value.toString(), style: textTheme.headlineSmall);
       case ValueType.entityId:
-        return EntityIdView(value: value, labels: labels);
+        return EntityIdView(value: value as EntityIdValue, labels: labels);
       case ValueType.monolingualText:
-        return MonolingualTextView(value: value);
+        return MonolingualTextView(value: value as MonolingualText);
       case ValueType.quantity:
-        return QuantityView(value: value, labels: labels);
+        return QuantityView(value: value as QuantityValue, labels: labels);
       default:
         throw new UnsupportedError("Unsupported value type");
     }
@@ -375,17 +376,17 @@ class EntityClaimView extends StatelessWidget {
 }
 
 class EntityIdView extends StatelessWidget {
-  const EntityIdView({Key key, @required this.value, @required this.labels}) : super(key: key);
+  const EntityIdView({Key? key, required this.value, required this.labels}) : super(key: key);
 
   final EntityIdValue value;
   final Map<String, String> labels;
 
   @override
-  Widget build(BuildContext context) => InkWell(child: Text(labels[value.qid]), onTap: () => _navigateToQid(context, value.qid));
+  Widget build(BuildContext context) => InkWell(child: Text(labels[value.qid] ?? value.qid), onTap: () => _navigateToQid(context, value.qid));
 }
 
 class MonolingualTextView extends StatelessWidget {
-  const MonolingualTextView({Key key, @required this.value}) : super(key: key);
+  const MonolingualTextView({Key? key, required this.value}) : super(key: key);
 
   final MonolingualText value;
 
@@ -397,7 +398,7 @@ class MonolingualTextView extends StatelessWidget {
 }
 
 class QuantityView extends StatelessWidget {
-  const QuantityView({Key key, @required this.value, @required this.labels}) : super(key: key);
+  const QuantityView({Key? key, required this.value, required this.labels}) : super(key: key);
 
   final QuantityValue value;
   final Map<String, String> labels;
@@ -414,14 +415,14 @@ class QuantityView extends StatelessWidget {
             padding: EdgeInsets.only(left: 5),
             child: ActionChip(
               label: Text(unit),
-              onPressed: () => _navigateToQid(context, unitQid),
+              onPressed: () => unitQid != null ? _navigateToQid(context, unitQid) : null,
             )),
     ]);
   }
 }
 
 class EntitySiteLinksView extends StatelessWidget {
-  const EntitySiteLinksView({@required this.orderedLinks, Key key}) : super(key: key);
+  const EntitySiteLinksView({required this.orderedLinks, Key? key}) : super(key: key);
 
   final List<MapEntry<String, SiteLink>> orderedLinks;
 
@@ -429,8 +430,9 @@ class EntitySiteLinksView extends StatelessWidget {
   Widget build(BuildContext context) => ListView.builder(
       itemBuilder: (content, index) => ListTile(
           leading: Text(orderedLinks[index].key),
-          title:
-              InkWell(child: Text(orderedLinks[index].value.pageTitle), onTap: () => launch(_siteLinkUrl(orderedLinks[index].key, orderedLinks[index].value)))),
+          title: InkWell(
+              child: Text(orderedLinks[index].value.pageTitle),
+              onTap: () => launchUrlString(_siteLinkUrl(orderedLinks[index].key, orderedLinks[index].value)))),
       itemCount: orderedLinks.length);
 
   static String _siteLinkUrl(String site, SiteLink link) => wikiSiteBaseUrl(site) + encodePageTitleToUrl(link.pageTitle);
@@ -442,10 +444,10 @@ class EntitySearchDelegate extends SearchDelegate<String> {
   EntitySearchDelegate(this._searchBloc);
 
   @override
-  List<Widget> buildActions(BuildContext context) => null;
+  List<Widget>? buildActions(BuildContext context) => null;
 
   @override
-  Widget buildLeading(BuildContext context) => null;
+  Widget? buildLeading(BuildContext context) => null;
 
   @override
   Widget buildResults(BuildContext context) => _buildSearchResults(context);
@@ -473,20 +475,20 @@ class EntitySearchDelegate extends SearchDelegate<String> {
   }
 
   Widget _buildSearchResult(BuildContext context, SearchResult result) =>
-      ListTile(title: TitleHighlightText(pieces: result.titlePieces), subtitle: Text(result.description ?? ""), onTap: () => close(context, result.qid));
+      ListTile(title: TitleHighlightText(pieces: result.titlePieces), subtitle: Text(result.description), onTap: () => close(context, result.qid));
 }
 
 class TitleHighlightText extends StatelessWidget {
   final List<String> pieces;
 
-  const TitleHighlightText({Key key, @required this.pieces}) : super(key: key);
+  const TitleHighlightText({Key? key, required this.pieces}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final boldStyle = TextStyle(fontWeight: FontWeight.bold);
     final normalStyle = DefaultTextStyle.of(context).style;
 
-    switch (pieces?.length ?? 0) {
+    switch (pieces.length) {
       case 0:
         return Text("");
       case 1:
@@ -502,10 +504,10 @@ class TitleHighlightText extends StatelessWidget {
 }
 
 BlocWidgetBuilder<SearchState> _buildAsyncBuilder({
-  @required Widget dataBuilder(BuildContext context, List<SearchResult> results),
-  @required Widget errorBuilder(BuildContext context, Object error),
-  @required Widget waitingBuilder(BuildContext context),
-  @required Widget emptyBuilder(BuildContext context),
+  required Widget dataBuilder(BuildContext context, List<SearchResult> results),
+  required Widget errorBuilder(BuildContext context, Object error),
+  required Widget waitingBuilder(BuildContext context),
+  required Widget emptyBuilder(BuildContext context),
 }) {
   Widget asyncBuilder(BuildContext context, SearchState state) {
     if (state.isSuccess) return dataBuilder(context, (state as SearchStateSuccess).results);
